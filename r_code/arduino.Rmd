@@ -30,7 +30,7 @@ library(here)
 library(lubridate)
 
 filename_tris <- "1214TRIS" #filename
-slice_start <-  20 #number of rows to remove from beginning
+slice_start <-  200 #number of rows to remove from beginning
 slice_end <- 10 #number of rows to remove from end
 ```
 
@@ -104,12 +104,23 @@ omegas_ph_tris <- data.frame(trisdata$date_time,omegas_temp_tris$durafet,omegas_
 
 calibration_values <- omegas_ph_tris %>% # work in omegas_calibration dataframe
   filter(row_number()!=c(1:100)) %>% # remove the first 100 rows (first 20 minutes of data)
-  slice_min(tempdiff,n=10) %>% # select the rows that contains the 10 minimum values of change in temperature over time 
-  slice_min(phdiff,n=1) # select the row that contains the minimum value of change in pH over time in within the 10 lowest temp differences
+  slice_min(tempdiff,n=10) %>% # select the rows that contains the minimum values of change in temperature over time 
+  slice_min(phdiff,n=1) %>% # select the row that contains the minimum value of change in pH over time in within the 10 lowest temp differences
+  mutate(diff_omegasph = (omegasph - mean(omegasph))) %>%
+  slice_min(diff_omegasph)
+
+#Append identifying information before writing .csv
+omegas_ph_tris <- omegas_ph_tris %>%
+  mutate(logger = "arduino",
+         tolerance = "ideal")
+
+calibration_values <- calibration_values %>%
+  mutate(logger = "arduino",
+         tolerance = "ideal")
 
 #Write out .csv files
-write.csv(omegas_ph_tris, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas.csv", sep="")),row.names = FALSE) # create csv with calibrated values
-write.csv(calibration_values, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_calib.csv", sep="")),row.names=FALSE)
+#write.csv(omegas_ph_tris, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas.csv", sep="")),row.names = FALSE) # create csv with calibrated values
+#write.csv(calibration_values, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_calib.csv", sep="")),row.names=FALSE)
 ```
 
 ## Run +5 tolerance calibration for Arduino tris
@@ -183,11 +194,22 @@ omegas_ph_tris <- data.frame(trisdata$date_time,omegas_temp_tris$durafet,omegas_
 calibration_values <- omegas_ph_tris %>% # work in omegas_calibration dataframe
   filter(row_number()!=c(1:100)) %>% # remove the first 100 rows (first 20 minutes of data)
   slice_min(tempdiff,n=10) %>% # select the rows that contains the 10 minimum values of change in temperature over time 
-  slice_min(phdiff,n=1) # select the row that contains the minimum value of change in pH over time in within the 10 lowest temp differences
+  slice_min(phdiff,n=1) %>% # select the row that contains the minimum value of change in pH over time in within the 10 lowest temp differences
+  mutate(diff_omegasph = (omegasph - mean(omegasph))) %>%
+  slice_min(diff_omegasph)
+
+#Append identifying information before writing .csv
+omegas_ph_tris <- omegas_ph_tris %>%
+  mutate(logger = "arduino",
+         tolerance = "+5")
+
+calibration_values <- calibration_values %>%
+  mutate(logger = "arduino",
+         tolerance = "+5")
 
 #Write out .csv files
-write.csv(omegas_ph_tris, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_plus5.csv", sep="")),row.names = FALSE) # create csv with calibrated values
-write.csv(calibration_values, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_plus5_calib.csv", sep="")),row.names=FALSE)
+#write.csv(omegas_ph_tris, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_plus5.csv", sep="")),row.names = FALSE) # create csv with calibrated values
+#write.csv(calibration_values, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_plus5_calib.csv", sep="")),row.names=FALSE)
 ```
 
 ## Run -5 tolerance calibration for Arduino tris
@@ -261,9 +283,20 @@ omegas_ph_tris <- data.frame(trisdata$date_time,omegas_temp_tris$durafet,omegas_
 calibration_values <- omegas_ph_tris %>% # work in omegas_calibration dataframe
   filter(row_number()!=c(1:100)) %>% # remove the first 100 rows (first 20 minutes of data)
   slice_min(tempdiff,n=10) %>% # select the rows that contains the 10 minimum values of change in temperature over time 
-  slice_min(phdiff,n=1) # select the row that contains the minimum value of change in pH over time in within the 10 lowest temp differences
+  slice_min(phdiff,n=1) %>% # select the row that contains the minimum value of change in pH over time in within the 10 lowest temp differences
+  mutate(diff_omegasph = (omegasph - mean(omegasph))) %>%
+  slice_min(diff_omegasph)
+
+#Append identifying information before writing .csv
+omegas_ph_tris <- omegas_ph_tris %>%
+  mutate(logger = "arduino",
+         tolerance = "-5")
+
+calibration_values <- calibration_values %>%
+  mutate(logger = "arduino",
+         tolerance = "-5")
 
 #Write out .csv files
-write.csv(omegas_ph_tris, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_minus5.csv", sep="")),row.names = FALSE) # create csv with calibrated values
-write.csv(calibration_values, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_minus5_calib.csv", sep="")),row.names=FALSE)
+#write.csv(omegas_ph_tris, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_minus5.csv", sep="")),row.names = FALSE) # create csv with calibrated values
+#write.csv(calibration_values, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_minus5_calib.csv", sep="")),row.names=FALSE)
 ```
