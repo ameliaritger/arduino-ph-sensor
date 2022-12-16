@@ -113,6 +113,15 @@ calibration_values <- omegas_ph_tris %>% # work in omegas_calibration dataframe
   slice_min(tempdiff,n=10) %>% # select the rows that contains the 10 minimum values of change in temperature over time 
   slice_min(phdiff,n=1) # select the row that contains the minimum value of change in pH over time in within the 10 lowest temp differences
 
+#Append identifying information before writing .csv
+omegas_ph_tris <- omegas_ph_tris %>%
+  mutate(logger = "madgetech",
+         tolerance = "ideal")
+
+calibration_values <- calibration_values %>%
+  mutate(logger = "madgetech",
+         tolerance = "ideal")
+
 #Write out .csv files
 #write.csv(omegas_ph_tris, here("data", "calibrated", paste(filename_tris,"_omegas.csv", sep="")),row.names = FALSE) # create csv with calibrated values
 #write.csv(calibration_values, here("data", "calibrated", paste(filename_tris,"_omegas_calib.csv", sep="")),row.names=FALSE)
@@ -192,9 +201,18 @@ calibration_values <- omegas_ph_tris %>% # work in omegas_calibration dataframe
   slice_min(tempdiff,n=10) %>% # select the rows that contains the 10 minimum values of change in temperature over time 
   slice_min(phdiff,n=1) # select the row that contains the minimum value of change in pH over time in within the 10 lowest temp differences
 
+#Append identifying information before writing .csv
+omegas_ph_tris <- omegas_ph_tris %>%
+  mutate(logger = "madgetech",
+         tolerance = "+1")
+
+calibration_values <- calibration_values %>%
+  mutate(logger = "madgetech",
+         tolerance = "+1")
+
 #Write out .csv files
-write.csv(omegas_ph_tris, here("data", "calibrated", paste(filename_tris,"_omegas_plus1.csv", sep="")),row.names = FALSE) # create csv with calibrated values
-write.csv(calibration_values, here("data", "calibrated", paste(filename_tris,"_omegas_plus1_calib.csv", sep="")),row.names=FALSE)
+#write.csv(omegas_ph_tris, here("data", "calibrated", paste(filename_tris,"_omegas_plus1.csv", sep="")),row.names = FALSE) # create csv with calibrated values
+#write.csv(calibration_values, here("data", "calibrated", paste(filename_tris,"_omegas_plus1_calib.csv", sep="")),row.names=FALSE)
 ```
 
 ## Run -1 tolerance calibration for Madgetech tris
@@ -271,7 +289,16 @@ calibration_values <- omegas_ph_tris %>% # work in omegas_calibration dataframe
   slice_min(tempdiff,n=10) %>% # select the rows that contains the 10 minimum values of change in temperature over time 
   slice_min(phdiff,n=1) # select the row that contains the minimum value of change in pH over time in within the 10 lowest temp differences
 
+#Append identifying information before writing .csv
+omegas_ph_tris <- omegas_ph_tris %>%
+  mutate(logger = "madgetech",
+         tolerance = "-1")
+
+calibration_values <- calibration_values %>%
+  mutate(logger = "madgetech",
+         tolerance = "-1")
+
 #Write out .csv files
-write.csv(omegas_ph_tris, here("data", "calibrated", paste(filename_tris,"_omegas_minus1.csv", sep="")),row.names = FALSE) # create csv with calibrated values
-write.csv(calibration_values, here("data", "calibrated", paste(filename_tris,"_omegas_minus1_calib.csv", sep="")),row.names=FALSE)
+#write.csv(omegas_ph_tris, here("data", "calibrated", paste(filename_tris,"_omegas_minus1.csv", sep="")),row.names = FALSE) # create csv with calibrated values
+#write.csv(calibration_values, here("data", "calibrated", paste(filename_tris,"_omegas_minus1_calib.csv", sep="")),row.names=FALSE)
 ```
