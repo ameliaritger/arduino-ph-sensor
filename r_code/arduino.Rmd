@@ -29,7 +29,7 @@ library(janitor)
 library(here)
 library(lubridate)
 
-filename_tris <- "1214TRIS" #filename
+filename_tris <- "1215TRIS" #filename
 slice_start <-  200 #number of rows to remove from beginning
 slice_end <- 10 #number of rows to remove from end
 ```
@@ -112,15 +112,21 @@ calibration_values <- omegas_ph_tris %>% # work in omegas_calibration dataframe
 #Append identifying information before writing .csv
 omegas_ph_tris <- omegas_ph_tris %>%
   mutate(logger = "arduino",
-         tolerance = "ideal")
+         tolerance = "ideal") %>%
+  rename("date_time" = "trisdata.date_time",
+         "durafet_temp" = "omegas_temp_tris.durafet",
+         "v1" = "omegas_temp_tris.v1")
 
 calibration_values <- calibration_values %>%
   mutate(logger = "arduino",
-         tolerance = "ideal")
+         tolerance = "ideal") %>%
+  rename("date_time" = "trisdata.date_time",
+         "durafet_temp" = "omegas_temp_tris.durafet",
+         "v1" = "omegas_temp_tris.v1")
 
 #Write out .csv files
-#write.csv(omegas_ph_tris, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas.csv", sep="")),row.names = FALSE) # create csv with calibrated values
-#write.csv(calibration_values, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_calib.csv", sep="")),row.names=FALSE)
+write.csv(omegas_ph_tris, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas.csv", sep="")),row.names = FALSE) # create csv with calibrated values
+write.csv(calibration_values, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_calib.csv", sep="")),row.names=FALSE)
 ```
 
 ## Run +5 tolerance calibration for Arduino tris
@@ -201,15 +207,21 @@ calibration_values <- omegas_ph_tris %>% # work in omegas_calibration dataframe
 #Append identifying information before writing .csv
 omegas_ph_tris <- omegas_ph_tris %>%
   mutate(logger = "arduino",
-         tolerance = "+5")
+         tolerance = "+5") %>%
+  rename("date_time" = "trisdata.date_time",
+         "durafet_temp" = "omegas_temp_tris.durafet",
+         "v1" = "omegas_temp_tris.v1")
 
 calibration_values <- calibration_values %>%
   mutate(logger = "arduino",
-         tolerance = "+5")
+         tolerance = "+5") %>%
+  rename("date_time" = "trisdata.date_time",
+         "durafet_temp" = "omegas_temp_tris.durafet",
+         "v1" = "omegas_temp_tris.v1")
 
 #Write out .csv files
-#write.csv(omegas_ph_tris, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_plus5.csv", sep="")),row.names = FALSE) # create csv with calibrated values
-#write.csv(calibration_values, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_plus5_calib.csv", sep="")),row.names=FALSE)
+write.csv(omegas_ph_tris, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_plus5.csv", sep="")),row.names = FALSE) # create csv with calibrated values
+write.csv(calibration_values, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_plus5_calib.csv", sep="")),row.names=FALSE)
 ```
 
 ## Run -5 tolerance calibration for Arduino tris
@@ -290,13 +302,19 @@ calibration_values <- omegas_ph_tris %>% # work in omegas_calibration dataframe
 #Append identifying information before writing .csv
 omegas_ph_tris <- omegas_ph_tris %>%
   mutate(logger = "arduino",
-         tolerance = "-5")
+         tolerance = "-5") %>%
+  rename("date_time" = "trisdata.date_time",
+         "durafet_temp" = "omegas_temp_tris.durafet",
+         "v1" = "omegas_temp_tris.v1")
 
 calibration_values <- calibration_values %>%
   mutate(logger = "arduino",
-         tolerance = "-5")
+         tolerance = "-5") %>%
+  rename("date_time" = "trisdata.date_time",
+         "durafet_temp" = "omegas_temp_tris.durafet",
+         "v1" = "omegas_temp_tris.v1")
 
 #Write out .csv files
-#write.csv(omegas_ph_tris, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_minus5.csv", sep="")),row.names = FALSE) # create csv with calibrated values
-#write.csv(calibration_values, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_minus5_calib.csv", sep="")),row.names=FALSE)
+write.csv(omegas_ph_tris, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_minus5.csv", sep="")),row.names = FALSE) # create csv with calibrated values
+write.csv(calibration_values, here("data", "calibrated",  paste(filename_tris,"_arduino_omegas_minus5_calib.csv", sep="")),row.names=FALSE)
 ```

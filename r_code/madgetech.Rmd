@@ -35,7 +35,7 @@ library(janitor)
 library(here)
 library(lubridate)
 
-filename_tris <- "1214_tris_madge"
+filename_tris <- "1215_tris_madge"
 ```
 
 
@@ -116,15 +116,19 @@ calibration_values <- omegas_ph_tris %>% # work in omegas_calibration dataframe
 #Append identifying information before writing .csv
 omegas_ph_tris <- omegas_ph_tris %>%
   mutate(logger = "madgetech",
-         tolerance = "ideal")
+         tolerance = "ideal") %>%
+  rename("durafet_temp" = "omegas_temp_tris.durafet",
+         "v1" = "omegas_temp_tris.v1")
 
 calibration_values <- calibration_values %>%
   mutate(logger = "madgetech",
-         tolerance = "ideal")
+         tolerance = "ideal") %>%
+  rename("durafet_temp" = "omegas_temp_tris.durafet",
+         "v1" = "omegas_temp_tris.v1")
 
 #Write out .csv files
-#write.csv(omegas_ph_tris, here("data", "calibrated", paste(filename_tris,"_omegas.csv", sep="")),row.names = FALSE) # create csv with calibrated values
-#write.csv(calibration_values, here("data", "calibrated", paste(filename_tris,"_omegas_calib.csv", sep="")),row.names=FALSE)
+write.csv(omegas_ph_tris, here("data", "calibrated", paste(filename_tris,"_omegas.csv", sep="")),row.names = FALSE) # create csv with calibrated values
+write.csv(calibration_values, here("data", "calibrated", paste(filename_tris,"_omegas_calib.csv", sep="")),row.names=FALSE)
 ```
 
 ## Run +1 tolerance calibration for Madgetech tris
@@ -204,15 +208,19 @@ calibration_values <- omegas_ph_tris %>% # work in omegas_calibration dataframe
 #Append identifying information before writing .csv
 omegas_ph_tris <- omegas_ph_tris %>%
   mutate(logger = "madgetech",
-         tolerance = "+1")
+         tolerance = "+1") %>%
+  rename("durafet_temp" = "omegas_temp_tris.durafet",
+         "v1" = "omegas_temp_tris.v1")
 
 calibration_values <- calibration_values %>%
   mutate(logger = "madgetech",
-         tolerance = "+1")
+         tolerance = "+1") %>%
+  rename("durafet_temp" = "omegas_temp_tris.durafet",
+         "v1" = "omegas_temp_tris.v1")
 
 #Write out .csv files
-#write.csv(omegas_ph_tris, here("data", "calibrated", paste(filename_tris,"_omegas_plus1.csv", sep="")),row.names = FALSE) # create csv with calibrated values
-#write.csv(calibration_values, here("data", "calibrated", paste(filename_tris,"_omegas_plus1_calib.csv", sep="")),row.names=FALSE)
+write.csv(omegas_ph_tris, here("data", "calibrated", paste(filename_tris,"_omegas_plus1.csv", sep="")),row.names = FALSE) # create csv with calibrated values
+write.csv(calibration_values, here("data", "calibrated", paste(filename_tris,"_omegas_plus1_calib.csv", sep="")),row.names=FALSE)
 ```
 
 ## Run -1 tolerance calibration for Madgetech tris
@@ -292,13 +300,17 @@ calibration_values <- omegas_ph_tris %>% # work in omegas_calibration dataframe
 #Append identifying information before writing .csv
 omegas_ph_tris <- omegas_ph_tris %>%
   mutate(logger = "madgetech",
-         tolerance = "-1")
+         tolerance = "-1") %>%
+  rename("durafet_temp" = "omegas_temp_tris.durafet",
+         "v1" = "omegas_temp_tris.v1")
 
 calibration_values <- calibration_values %>%
   mutate(logger = "madgetech",
-         tolerance = "-1")
+         tolerance = "-1") %>%
+  rename("durafet_temp" = "omegas_temp_tris.durafet",
+         "v1" = "omegas_temp_tris.v1")
 
 #Write out .csv files
-#write.csv(omegas_ph_tris, here("data", "calibrated", paste(filename_tris,"_omegas_minus1.csv", sep="")),row.names = FALSE) # create csv with calibrated values
-#write.csv(calibration_values, here("data", "calibrated", paste(filename_tris,"_omegas_minus1_calib.csv", sep="")),row.names=FALSE)
+write.csv(omegas_ph_tris, here("data", "calibrated", paste(filename_tris,"_omegas_minus1.csv", sep="")),row.names = FALSE) # create csv with calibrated values
+write.csv(calibration_values, here("data", "calibrated", paste(filename_tris,"_omegas_minus1_calib.csv", sep="")),row.names=FALSE)
 ```
