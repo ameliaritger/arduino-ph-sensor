@@ -9,28 +9,40 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Load libraries and data
+Load libraries and sensor data
 ```{r}
 library(tidyverse)
 library(here)
 library(lubridate)
 
-pattern_keep = "1214" #set the date of interest
+pattern_keep = "1215" #set the date of interest
 pattern_remove = "_calib" #exclude calibration files
 
 files_all <- list.files(here("data", "calibrated"), pattern = pattern_keep, recursive = TRUE, full.names = TRUE)
 files_calib <- list.files(here("data", "calibrated"), pattern = pattern_remove, recursive = TRUE, full.names = TRUE)
 file_names <- setdiff(files_all, files_calib)
 
-all_merged <- read_csv(file_names, col_names = TRUE) %>%
-  rename("date_time" = "trisdata.date_time",
-         "durafet_temp" = "omegas_temp_tris.durafet",
-         "v1" = "omegas_temp_tris.v1")
+merged <- read_csv(file_names, col_names = TRUE)
 ```
+
+Load and merge hobo logger data
+```{r}
+temp <- read_csv(here("data", "temp", paste(pattern_keep,"_hobo.csv", sep="")), col_names = TRUE) %>%
+  slice(50:(n())) %>% # remove first 2 and last 2 minutes of data (12 rows)
+  select(2:3) %>%
+  setNames(c("date_time", "hobo_temp")) %>%
+  mutate(date_time=mdy_hms(date_time)) #aapply lubridate to date/time column
+         #date=format(date_time, '%m/%d/%Y'), #create only date column
+         #time=format(date_time, '%H:%M:%S')) #create only time column
+
+merged_all <- full_join(merged, temp)
+```
+
 
 Plot up Arduino data comparison
 ```{r}
-ggplot(all_merged, aes(x=date_time, y=durafet_temp)) +
-  geom_point(aes(color=tolerance))
+ggplot(data=merged_all, aes(x=date_time)) +
+  geom_point(aes(y=durafet_temp, color=tolerance)) +
+  geom_point(aes(y=hobo_temp))
 ```
 
