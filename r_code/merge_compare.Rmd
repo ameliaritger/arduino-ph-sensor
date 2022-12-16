@@ -1,0 +1,36 @@
+---
+title: "compare madgetech and arduino reads"
+author: "Amelia Ritger"
+date: "2022-12-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load libraries and data
+```{r}
+library(tidyverse)
+library(here)
+library(lubridate)
+
+pattern_keep = "1214" #set the date of interest
+pattern_remove = "_calib" #exclude calibration files
+
+files_all <- list.files(here("data", "calibrated"), pattern = pattern_keep, recursive = TRUE, full.names = TRUE)
+files_calib <- list.files(here("data", "calibrated"), pattern = pattern_remove, recursive = TRUE, full.names = TRUE)
+file_names <- setdiff(files_all, files_calib)
+
+all_merged <- read_csv(file_names, col_names = TRUE) %>%
+  rename("date_time" = "trisdata.date_time",
+         "durafet_temp" = "omegas_temp_tris.durafet",
+         "v1" = "omegas_temp_tris.v1")
+```
+
+Plot up Arduino data comparison
+```{r}
+ggplot(all_merged, aes(x=date_time, y=durafet_temp)) +
+  geom_point(aes(color=tolerance))
+```
+
