@@ -19,8 +19,8 @@ library(lubridate)
 
 filename_raw <- "1215DEPL"
 filename_tris <- "1215TRIS"
-slice_start <-  8 #number of rows to remove from beginning
-slice_end <- 3 #number of rows to remove from end
+start_time <-  "2022-12-15 13:30:00" #to remove
+end_time <- "2022-12-16 13:15:00" #to remove
 ```
 
 ## Run "Ideal" calibration for Arduino deployment data
@@ -34,8 +34,9 @@ rawdata_all <- read_csv(here("data", "raw", paste(filename_raw,".csv",sep=""))) 
   mutate(time_lubridate=hms(time)) %>% # tell R "time" is a TIME
   unite(date_time, c(date, time), sep = " ", remove = TRUE) %>% # combine the date and time columns
   mutate(date_time_lubridate=ymd_hms(date_time)) %>%# tell R "date_time" is a DATE and a TIME
-  arrange(date_time) %>%
-  slice(slice_start:(n()-(slice_end+1))) # remove first n rows of data
+  arrange(date_time_lubridate) %>%
+  filter(date_time_lubridate >= ymd_hms(start_time),
+         date_time_lubridate <= ymd_hms(end_time)) 
 
 rawdata <- rawdata_all %>%
   select(15, 3:6) %>%
@@ -110,7 +111,6 @@ raw_calibrated_ideal <- raw_calibrated %>%
 write.csv(raw_calibrated_ideal, here("data", "calibrated", paste(filename_raw,"_arduino_omegas.csv", sep="")),row.names = FALSE) # create csv with calibrated values
 ```
 
-
 ## Run +5 tolerance calibration for Arduino deployment data
 ```{r}
 #load calibration data
@@ -122,8 +122,9 @@ rawdata_all <- read_csv(here("data", "raw", paste(filename_raw,".csv",sep=""))) 
   mutate(time_lubridate=hms(time)) %>% # tell R "time" is a TIME
   unite(date_time, c(date, time), sep = " ", remove = TRUE) %>% # combine the date and time columns
   mutate(date_time_lubridate=ymd_hms(date_time)) %>%# tell R "date_time" is a DATE and a TIME
-  arrange(date_time) %>%
-  slice(slice_start:(n()-(slice_end+1)))
+  arrange(date_time_lubridate) %>%
+  filter(date_time_lubridate >= ymd_hms(start_time),
+         date_time_lubridate <= ymd_hms(end_time)) 
 
 rawdata <- rawdata_all %>%
   select(15, 3:6) %>%
@@ -209,8 +210,9 @@ rawdata_all <- read_csv(here("data", "raw", paste(filename_raw,".csv",sep=""))) 
   mutate(time_lubridate=hms(time)) %>% # tell R "time" is a TIME
   unite(date_time, c(date, time), sep = " ", remove = TRUE) %>% # combine the date and time columns
   mutate(date_time_lubridate=ymd_hms(date_time)) %>%# tell R "date_time" is a DATE and a TIME
-  arrange(date_time) %>%
-  slice(slice_start:(n()-(slice_end+1)))
+  arrange(date_time_lubridate) %>%
+  filter(date_time_lubridate >= ymd_hms(start_time),
+         date_time_lubridate <= ymd_hms(end_time)) 
 
 rawdata <- rawdata_all %>%
   select(15, 3:6) %>%

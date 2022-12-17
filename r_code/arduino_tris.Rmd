@@ -11,18 +11,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ##Load libraries, set constants
 ```{r}
-##################  Before you begin ################## 
-#1. Create a folder called "raw" and a folder called "calibrated"
-#1a. Put sensor data (calibration and field data) in "raw" folder
-#1b. Expect calibrated data to be populated in the "calibrated" folder
-#1c. Make sure the input data are in the same location as this code (Creating an R Project is highly recommended)
-######################################################################################
-
-################## Things to know about the code ##################  
-# First 20 minutes of calibration data are removed from analysis
-# Values used to calibrate field data can be found in the "calibrated" folder
-######################################################################################
-
 library(tidyverse)
 library(readr)
 library(janitor)
@@ -30,8 +18,8 @@ library(here)
 library(lubridate)
 
 filename_tris <- "1216TRIS" #filename
-slice_start <-  200 #number of rows to remove from beginning
-slice_end <- 10 #number of rows to remove from end
+start_time <-  "2022-12-16 14:30:00" #start time (remove first ~30 min)
+end_time <- "2022-12-16 15:30:00" #end time (remove last ~5 min)
 ```
 
 ## Run "Ideal" calibration for Arduino tris
@@ -43,8 +31,9 @@ trisdata_all <- read_csv(here("data", "raw", paste(filename_tris,".csv",sep=""))
   mutate(time_lubridate=hms(time)) %>% # tell R "time" is a TIME
   unite(date_time, c(date, time), sep = " ", remove = TRUE) %>% # combine the date and time columns
   mutate(date_time_lubridate=ymd_hms(date_time)) %>% # tell R "date_time" is a DATE and a TIME
-  arrange(1) %>%
-  slice(slice_start:(n()-(slice_end+1))) # remove first n rows of data
+  arrange(date_time_lubridate) %>%
+  filter(date_time_lubridate >= ymd_hms(start_time),
+         date_time_lubridate <= ymd_hms(end_time)) 
 
 trisdata <- trisdata_all %>%
   select(15, 3:6) %>%
@@ -139,8 +128,9 @@ trisdata_all <- read_csv(here("data", "raw", paste(filename_tris,".csv",sep=""))
   mutate(time_lubridate=hms(time)) %>% # tell R "time" is a TIME
   unite(date_time, c(date, time), sep = " ", remove = TRUE) %>% # combine the date and time columns
   mutate(date_time_lubridate=ymd_hms(date_time)) %>% # tell R "date_time" is a DATE and a TIME
-  arrange(1) %>%
-  slice(slice_start:(n()-(slice_end+1))) 
+  arrange(date_time_lubridate) %>%
+  filter(date_time_lubridate >= ymd_hms(start_time),
+         date_time_lubridate <= ymd_hms(end_time)) 
 
 trisdata <- trisdata_all %>%
   select(15, 3:6) %>%
@@ -235,8 +225,9 @@ trisdata_all <- read_csv(here("data", "raw", paste(filename_tris,".csv",sep=""))
   mutate(time_lubridate=hms(time)) %>% # tell R "time" is a TIME
   unite(date_time, c(date, time), sep = " ", remove = TRUE) %>% # combine the date and time columns
   mutate(date_time_lubridate=ymd_hms(date_time)) %>% # tell R "date_time" is a DATE and a TIME
-  arrange(1) %>%
-  slice(slice_start:(n()-(slice_end+1))) 
+  arrange(date_time_lubridate) %>%
+  filter(date_time_lubridate >= ymd_hms(start_time),
+         date_time_lubridate <= ymd_hms(end_time))  
 
 trisdata <- trisdata_all %>%
   select(15, 3:6) %>%
