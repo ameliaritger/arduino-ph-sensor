@@ -1,0 +1,93 @@
+---
+title: "compare madgetech and arduino reads"
+author: "Amelia Ritger"
+date: "2022-12-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load libraries
+```{r}
+library(tidyverse)
+library(here)
+library(lubridate)
+```
+
+Load sensor data
+```{r}
+pattern_keep = "1215" #set the date of interest
+pattern_remove_tris = "tris" #exclude tris files
+pattern_remove_calib = "_calib" #exclude calibration files
+
+files_all <- list.files(here("data", "calibrated"), pattern = pattern_keep, recursive = TRUE, full.names = TRUE)
+files_tris <- list.files(here("data", "calibrated"), pattern = pattern_remove_tris, recursive = TRUE, ignore.case = TRUE, full.names = TRUE)
+files_calib <- list.files(here("data", "calibrated"), pattern = pattern_remove_calib, recursive = TRUE, full.names = TRUE)
+file_names <- setdiff(files_all, files_tris)
+file_names <- setdiff(file_names, files_calib)
+
+merged <- read_csv(file_names, col_names = TRUE)
+```
+
+Load and merge hobo logger data
+```{r}
+temp <- read_csv(here("data", "temp", paste(pattern_keep,"_hobo_depl.csv", sep="")), col_names = TRUE) %>%
+  slice(50:(n())) %>% # remove first 2 and last 2 minutes of data (12 rows)
+  select(2:3) %>%
+  setNames(c("date_time", "hobo_temp")) %>%
+  mutate(date_time=mdy_hms(date_time)) #aapply lubridate to date/time column
+         #date=format(date_time, '%m/%d/%Y'), #create only date column
+         #time=format(date_time, '%H:%M:%S')) #create only time column
+
+merged_all <- full_join(merged, temp)
+```
+
+Change sampling range (air bubbles for first 8 hours?)
+```{r}
+merged_sub <- merged_all %>%
+   filter(date_time > ymd_hms("2022-12-15 20:00:00"))
+
+merged_subb <- merged_all %>%
+   filter(date_time > ymd_hms("2022-12-16 00:00:00"),
+          date_time < ymd_hms("2022-12-16 06:00:00")) %>%
+  filter(tolerance=="ideal" | is.na(tolerance)) %>%
+  mutate(logger = ifelse(is.na(logger), "hobo", logger),
+         temp_c = ifelse(logger=="hobo", hobo_temp, durafet_temp))
+```
+
+Plot up Arduino data comparison
+```{r}
+ggplot(data=merged_sub, aes(x=date_time)) +
+  #geom_point(aes(y=p_h, color=tolerance, shape=logger))
+  geom_point(aes(y=durafet_temp, color=tolerance, shape=logger))
+```
+
+Fill hobo temps?
+```{r}
+merge_hobo <- merged_sub %>%
+  arrange(date_time) %>%
+  mutate(diff = date_time-lag(date_time, default = first(date_time))) %>%
+  mutate(temp_down = hobo_temp,
+         temp_up = hobo_temp) %>%
+  fill(temp_down, .direction = "down") %>%
+  fill(temp_up, .direction = "up") %>%
+  mutate(hobo_real = ifelse(diff<20,temp_up,temp_down),
+         durafet_fill = ifelse(is.na(hobo_temp),durafet_temp, hobo_real)) %>%
+  select(1:2, 6:11)
+```
+
+Plot temperature section to compare between HOBO and sensors
+```{r}
+library(ggpmisc)
+ggplot(data=merged_subb, aes(x=date_time, y=temp_c, group=logger)) +
+  #geom_point(aes(y=p_h, color=tolerance, shape=logger))
+  geom_point() +
+  stat_poly_line() +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label)))) +
+  scale_y_continuous(limits=c(7.0, 8.8))
+
+ggsave("temp_correction.png")
+```
+
