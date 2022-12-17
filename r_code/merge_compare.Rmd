@@ -15,9 +15,9 @@ library(tidyverse)
 library(here)
 library(lubridate)
 
-pattern_keep = "1214" #set the date of interest
-start_time <-  "12-14-2022 18:00:00" #to remove 12-15-2022 11:00:00, 12-14-2022 18:00:00
-end_time <- "12-14-2022 18:30:00" #to remove 12-15-2022 12:00:00, 12-14-2022 18:30:00
+pattern_keep = "1216" #set the date of interest
+start_time <-  "12-16-2022 14:30:00" #to remove 12-15-2022 11:00:00, 12-14-2022 18:00:00, 12-16-2022 14:30:00
+end_time <- "12-16-2022 15:30:00" #to remove 12-15-2022 11:40:00, 12-14-2022 18:30:00, 12-16-2022 15:30:00
 ```
 
 Load sensor data
@@ -54,8 +54,17 @@ merged_all <- full_join(merged, temp) %>%
 
 Plot up Arduino data comparison
 ```{r}
-ggplot(data=merged, aes(x=date_time)) +
-  geom_point(aes(y=durafet_temp, color=tolerance))
+merged_ribbon <- merged %>%
+  filter(!is.na(logger)) %>%
+  select(1,2,8,12,13) %>%
+  mutate(tolerance = ifelse(tolerance %in% c("+5", "+1"), "plus", ifelse(tolerance %in% c("-5", "-1"), "minus", "ideal"))) %>%
+  pivot_wider(names_from = tolerance, values_from = c(durafet_temp, omegasph))
+
+ggplot(data=merged_ribbon, aes(x=date_time, group=logger)) +
+  geom_point(aes(y=omegasph_ideal, color=logger)) +
+  geom_ribbon(aes(ymin=omegasph_minus, ymax=omegasph_plus, fill=logger), alpha=0.2)
+
+ggsave("12-16_compareph.png")
 ```
 
 
