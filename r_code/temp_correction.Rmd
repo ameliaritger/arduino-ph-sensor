@@ -11,25 +11,26 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Save the data as a .csv
 ```{r}
-#merge_temp_diff <- full_join(hobo_comp_deploy, hobo_comp_tris_15)
-#merge_temp_diff <- full_join(merge_temp_diff, hobo_comp_tris_16)
+merge_temp_diff <- full_join(log_comp_tris_15, log_comp_tris_16)
+merge_temp_diff <- full_join(merge_temp_diff, log_comp_tris_14)
+merge_temp_diff <- full_join(merge_temp_diff, log_comp_deploy)
 #merge_temp_diff <- full_join(merge_temp_diff, hobo_comp_tris_swap)
 
-#write_csv(merge_temp_diff, here("data", "temp", "hobo_correction.csv"))
+write_csv(merge_temp_diff, here("data", "temp", "logger_correction-madgetech.csv"))
 ```
 
 Plot the data
 ```{r}
 library(ggpmisc)
 
-data <- read_csv(here("data", "temp", "hobo_correction.csv"))
+data <- read_csv(here("data", "temp", "logger_correction-madgetech.csv"))
 
-ggplot(data, aes(x=mean_temp, y=mean_diff, group=logger)) +
-  geom_point(aes(color=logger)) +
-  #stat_poly_line() +
-  #stat_poly_eq(aes(label = paste(after_stat(eq.label)))) +
-  labs(x="Temperature", y="Avg temp difference between real and sensor")
+ggplot(data, aes(x=mean_temp, y=mean_diff)) +
+  geom_point() +
+  stat_poly_line() +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label)))) +
+  labs(x="Temperature", y="Avg temp difference between madgetech and arduino")
 
-ggsave("temp_correction_swapped.png")
+ggsave("temp_correction_logg_mad.png")
 ```
 
