@@ -11,18 +11,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ##Load libraries, set constants
 ```{r}
-##################  Before you begin ################## 
-#1. Create a folder called "raw" and a folder called "calibrated"
-#1a. Put sensor data (calibration and field data) in "raw" folder
-#1b. Expect calibrated data to be populated in the "calibrated" folder
-#1c. Make sure the input data are in the same location as this code (Creating an R Project is highly recommended)
-######################################################################################
-
-################## Things to know about the code ##################  
-# First 20 minutes of calibration data are removed from analysis
-# Values used to calibrate field data can be found in the "calibrated" folder
-######################################################################################
-
 library(tidyverse)
 library(readr)
 library(janitor)
@@ -30,6 +18,8 @@ library(here)
 library(lubridate)
 
 filename_tris <- "1216_tris_madge"
+start_time <-  "12-16-2022 14:30:00" #to remove
+end_time <- "12-16-2022 15:30:00" #to remove
 ```
 
 
@@ -46,9 +36,10 @@ trisdata <- read_csv(here("data", "raw", paste(filename_tris,".csv",sep=""))) %>
   mutate(time_lubridate=hms(time)) %>% # tell R "time" is a TIME
   unite(date_time, c(date, time), sep = " ", remove = TRUE) %>% # combine the date and time columns
   mutate(date_time_lubridate=mdy_hms(date_time)) %>% # tell R "date_time" is a DATE and a TIME
-  arrange(date_time) %>%
-  slice(12:(n()-12))
-  
+  arrange(date_time_lubridate) %>%
+  filter(date_time_lubridate >= mdy_hms(start_time),
+         date_time_lubridate <= mdy_hms(end_time)) 
+
 tris_voltages <- data.frame(trisdata$voltage_1_m_v,trisdata$voltage_2_m_v,trisdata$voltage_3_m_v,trisdata$voltage_4_m_v) %>% # create OMEGAS data frame with the tris voltages
   mutate(mv1=as.numeric(trisdata.voltage_1_m_v),
          mv2=as.numeric(trisdata.voltage_2_m_v),
@@ -139,8 +130,9 @@ trisdata <- read_csv(here("data", "raw", paste(filename_tris,".csv",sep=""))) %>
   mutate(time_lubridate=hms(time)) %>% # tell R "time" is a TIME
   unite(date_time, c(date, time), sep = " ", remove = TRUE) %>% # combine the date and time columns
   mutate(date_time_lubridate=mdy_hms(date_time)) %>% # tell R "date_time" is a DATE and a TIME
-  arrange(date_time) %>%
-  slice(12:(n()-12)) # remove first 2 and last 2 minutes of data (12 rows)
+  arrange(date_time_lubridate) %>%
+  filter(date_time_lubridate >= mdy_hms(start_time),
+         date_time_lubridate <= mdy_hms(end_time))
 
 tris_voltages <- data.frame(trisdata$voltage_1_m_v,trisdata$voltage_2_m_v,trisdata$voltage_3_m_v,trisdata$voltage_4_m_v) %>% # create OMEGAS data frame with the tris voltages
   mutate(mv1=as.numeric(trisdata.voltage_1_m_v),
@@ -232,8 +224,9 @@ trisdata <- read_csv(here("data", "raw", paste(filename_tris,".csv",sep=""))) %>
   mutate(time_lubridate=hms(time)) %>% # tell R "time" is a TIME
   unite(date_time, c(date, time), sep = " ", remove = TRUE) %>% # combine the date and time columns
   mutate(date_time_lubridate=mdy_hms(date_time)) %>% # tell R "date_time" is a DATE and a TIME
-  arrange(date_time) %>%
-  slice(12:(n()-12)) # remove first 2 and last 2 minutes of data (12 rows)
+  arrange(date_time_lubridate) %>%
+  filter(date_time_lubridate >= mdy_hms(start_time),
+         date_time_lubridate <= mdy_hms(end_time))
 
 tris_voltages <- data.frame(trisdata$voltage_1_m_v,trisdata$voltage_2_m_v,trisdata$voltage_3_m_v,trisdata$voltage_4_m_v) %>% # create OMEGAS data frame with the tris voltages
   mutate(mv1=as.numeric(trisdata.voltage_1_m_v),
