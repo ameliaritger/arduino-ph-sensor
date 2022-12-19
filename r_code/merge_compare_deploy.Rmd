@@ -16,9 +16,9 @@ library(here)
 library(lubridate)
 
 pattern_keep = "1215" #set the date of interest
-start_time <-  "2022-12-15 13:30:00" #to remove
-end_time <- "2022-12-16 13:15:00" #to remove
-filter_time <- "2022-12-15 23:00:00" 
+#start_time <-  "2022-12-15 13:30:00" #to remove
+#end_time <- "2022-12-16 13:15:00" #to remove
+#filter_time <- "2022-12-15 23:00:00" 
 ```
 
 Load sensor data
@@ -33,9 +33,63 @@ file_names <- setdiff(files_all, files_tris)
 file_names <- setdiff(file_names, files_calib)
 
 merged <- read_csv(file_names, col_names = TRUE) #%>% filter(date_time > ymd_hms("2022-12-15 16:00:00" ))
-# 
-# ggplot(merged, aes(x=date_time, y=durafet_temp)) +
-#   geom_point()
+
+ggplot(merged, aes(x=date_time, y=p_h)) +
+  geom_point(aes(color=logger))
+```
+
+Quick visualize
+```{r}
+merged_ribbon <- merged %>%
+  filter(!logger=="real-arduino") %>%
+  mutate(tolerance = ifelse(tolerance %in% c("+5", "+1"), "plus", ifelse(tolerance %in% c("-5", "-1"), "minus", "ideal"))) %>%
+  group_by(logger) %>%
+  pivot_wider(names_from = tolerance, values_from = c(durafet_temp, p_h))
+
+#plot up temp data
+ggplot(data=merged_ribbon, aes(x=date_time)) +
+  #geom_point(aes(y=p_h, color=tolerance, shape=logger))
+  geom_line(aes(y=durafet_temp_ideal, color=logger)) +
+  #geom_line(aes(y=durafet_temp_ideal, color=logger)) +
+  geom_ribbon(aes(ymin=durafet_temp_minus, ymax=durafet_temp_plus, fill=logger), alpha=0.2) +
+  labs(x="Date and Time", y="Temp (C)") +
+  scale_x_datetime(breaks = scales::date_breaks("3 hour"), 
+                   labels = date_format("%Y-%m-%d %H:00"),
+                   #limits = as.POSIXct(c("2022-12-15 23:00:00","2022-12-16 14:00:00")),
+                   expand = c(0, 0)) +
+  scale_color_brewer(palette="Set1", direction=-1) +
+  scale_fill_brewer(palette="Set1", direction=-1) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top")
+
+ggsave(here("figures", "final", "deployment-temp.png"), height=10, width=15, units="cm")
+
+#plot up pH data
+ggplot(data=merged_ribbon, aes(x=date_time)) +
+  #geom_point(aes(y=p_h, color=tolerance, shape=logger))
+  geom_line(aes(y=p_h_ideal, color=logger)) +
+  geom_ribbon(aes(ymin=p_h_minus, ymax=p_h_plus, fill=logger), alpha=0.2) +
+  labs(x="Date and Time", y="pH") +
+  scale_x_datetime(breaks = scales::date_breaks("3 hour"), 
+                   labels = date_format("%Y-%m-%d %H:00"),
+                   #limits = as.POSIXct(c("2022-12-15 23:00:00","2022-12-16 14:00:00")),
+                   expand = c(0, 0)) +
+  scale_color_brewer(palette="Set1", direction=-1) +
+  scale_fill_brewer(palette="Set1", direction=-1) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top")
+
+ggsave(here("figures", "final", "deployment-pH.png"), height=10, width=15, units="cm")
+
+#summary stats
+merged_sum <- merged_ribbon %>%
+  group_by(logger) %>%
+  summarize(meant = mean(durafet_temp_ideal),
+            sdt = sd(durafet_temp_ideal),
+            meanp = mean(p_h_ideal),
+            sdp = sd(p_h_ideal))
 ```
 
 Load and merge hobo logger data
@@ -62,26 +116,45 @@ Plot up Arduino data comparison
 merged_ribbon <- merged_sub %>%
   filter(!is.na(logger)) %>%
   mutate(tolerance = ifelse(tolerance %in% c("+5", "+1"), "plus", ifelse(tolerance %in% c("-5", "-1"), "minus", "ideal"))) %>%
-  select(1:5) %>%
+  mutate(Logger=ifelse(logger=="arduino", "New design", "Old design")) %>%
+  select(1:6) %>%
   pivot_wider(names_from = tolerance, values_from = c(durafet_temp, p_h))
 
 #plot up temp data
-ggplot(data=merged_ribbon, aes(x=date_time, group=logger)) +
+ggplot(data=merged_ribbon, aes(x=date_time, group=Logger)) +
   #geom_point(aes(y=p_h, color=tolerance, shape=logger))
-  geom_line(aes(y=durafet_temp_ideal, color=logger)) +
-  geom_ribbon(aes(ymin=durafet_temp_minus, ymax=durafet_temp_plus, fill=logger), alpha=0.2) +
-  labs(x="Date and Time", y="Temp (C)", label="Logger")
+  geom_line(aes(y=durafet_temp_ideal, color=Logger)) +
+  geom_ribbon(aes(ymin=durafet_temp_minus, ymax=durafet_temp_plus, fill=Logger), alpha=0.2) +
+  labs(x="Date and Time", y="Temp (C)") +
+  scale_x_datetime(breaks = scales::date_breaks("3 hour"), 
+                   labels = date_format("%Y-%m-%d %H:00"),
+                   #limits = as.POSIXct(c("2022-12-15 23:00:00","2022-12-16 14:00:00")),
+                   expand = c(0, 0)) +
+  scale_color_brewer(palette="Set1", direction=-1) +
+  scale_fill_brewer(palette="Set1", direction=-1) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top")
 
-ggsave(here("figures", "deployment-temp_subset.png"), height=20, width=40, units="cm")
+ggsave(here("figures", "deployment-temp_subset.png"), height=10, width=15, units="cm")
 
 #plot up pH data
-ggplot(data=merged_ribbon, aes(x=date_time, group=logger)) +
+ggplot(data=merged_ribbon, aes(x=date_time, group=Logger)) +
   #geom_point(aes(y=p_h, color=tolerance, shape=logger))
-  geom_line(aes(y=p_h_ideal, color=logger)) +
-  geom_ribbon(aes(ymin=p_h_minus, ymax=p_h_plus, fill=logger), alpha=0.2) +
-  labs(x="Date and Time", y="pH")
+  geom_line(aes(y=p_h_ideal, color=Logger)) +
+  geom_ribbon(aes(ymin=p_h_minus, ymax=p_h_plus, fill=Logger), alpha=0.2) +
+  labs(x="Date and Time", y="pH") +
+  scale_x_datetime(breaks = scales::date_breaks("3 hour"), 
+                   labels = date_format("%Y-%m-%d %H:00"),
+                   #limits = as.POSIXct(c("2022-12-15 23:00:00","2022-12-16 14:00:00")),
+                   expand = c(0, 0)) +
+  scale_color_brewer(palette="Set1", direction=-1) +
+  scale_fill_brewer(palette="Set1", direction=-1) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top")
 
-ggsave(here("figures", "deployment-ph_subset.png"), height=20, width=40, units="cm")
+ggsave(here("figures", "deployment-ph_subset.png"), height=10, width=15, units="cm")
 
 #look at average difference between madgetech and arduino readings for temp and pH
 merged_ribbon_compare <- merged_ribbon %>%
