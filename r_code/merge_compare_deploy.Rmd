@@ -104,7 +104,8 @@ merged_diff <- merged %>%
          diff_temp = durafet_temp-lag(durafet_temp, default=first(durafet_temp)),
          diff_ph = p_h-lag(p_h, default=first(p_h))) %>%
   ungroup() %>%
-  filter(!diff_temp==0)
+  filter(!diff_temp==0) %>%
+  mutate(same = ifelse(logger == lag(logger), "YES", "NO"))
 
 merged_diff_sum <- merged_diff %>%
   group_by(logger) %>%
