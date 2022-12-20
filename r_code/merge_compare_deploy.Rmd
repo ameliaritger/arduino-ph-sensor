@@ -92,6 +92,37 @@ merged_sum <- merged_ribbon %>%
             sdp = sd(p_h_ideal))
 ```
 
+Calculate difference between sensors during field deployments
+```{r}
+merged_diff <- merged %>%
+  #mutate(Logger=ifelse(logger=="arduino", "New design", "Old design")) %>%
+  filter(!logger=="real-arduino",
+         tolerance=="ideal") %>%
+  mutate(date_time = if_else(logger=="arduino" & date_time<ymd_hms("2022-12-15 19:15:44"), date_time+seconds(29), date_time)) %>%
+  arrange(date_time) %>%
+  mutate(diff_time = date_time-lag(date_time, default = first(date_time)),
+         diff_temp = durafet_temp-lag(durafet_temp, default=first(durafet_temp)),
+         diff_ph = p_h-lag(p_h, default=first(p_h))) %>%
+  ungroup() %>%
+  filter(!diff_temp==0)
+
+merged_diff_sum <- merged_diff %>%
+  group_by(logger) %>%
+  summarize(mean_temp = abs(mean(diff_temp)),
+            mean_ph = abs(mean(diff_ph))) %>%
+  summarize(meant = mean(mean_temp),
+            meanp = mean(mean_ph))
+        
+
+avg1 <- mean(0.06368266,0.06718390) #get these numbers from above
+avg_temp <- avg2-avg1 #0.0401972 -> #0.0438596
+
+avg3 <- mean(0.2478512,0.2479062)
+avg4 <- mean(0.2840733,0.2841385) #get these numbers from above
+avg_ph <- avg4-avg3 #0.036221 -> 0.036221
+
+```
+
 Load and merge hobo logger data
 ```{r}
 temp <- read_csv(here("data", "temp", paste(pattern_keep,"_hobo_depl.csv", sep="")), col_names = TRUE) %>%
