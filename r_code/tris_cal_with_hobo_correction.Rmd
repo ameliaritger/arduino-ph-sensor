@@ -30,11 +30,7 @@ var_madg <- 0.16978 #calculated uncertainties using raw data
 #madg_correction_m <- 1+0.106 #slope coefficient for madgetech (corrected with #HOBO)
 #madg_correction_b <- 0.123
 
-#Correction values for SWAPPED sensors
-#madg_correction_m <- 1+0.099 #slope coefficient for arduino (corrected with HOBO)
-#madg_correction_b <- 0.632
-#ard_correction_m <- 1+0.106 #slope coefficient for madgetech (corrected with #HOBO)
-#ard_correction_b <- -0.123
+#Correction values for SWAPPED sensors - don't trust these fully because N=1, "too perfect" correction of data
 madg_correction_m <- 1-0.43 #.425 #slope coefficient for madgetech (corrected with HOBO)
 madg_correction_b <- -8.7
 ard_correction_m <- 1-0.51 #.511 #slope coefficient for arduino (corrected with HOBO)
