@@ -1,6 +1,13 @@
 #ifndef src_h
 #define src_h dw
 
+// For printing a timestamp ("last modified" to the SD card
+void SDfileDate(uint16_t* date, uint16_t* time) {
+ *date = FAT_DATE(year(), month(), day());
+ *time = FAT_TIME(hour(), minute(), second());
+}
+
+
 void printDateTime(time_t t){
     Serial << ((day(t)<10) ? "0" : "") << _DEC(day(t));
     Serial << monthShortStr(month(t)) << _DEC(year(t)) << ' ';
