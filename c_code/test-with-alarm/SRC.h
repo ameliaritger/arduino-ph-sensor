@@ -1,12 +1,5 @@
 #ifndef src_h
-#define src_h dw
-
-// For printing a timestamp ("last modified" to the SD card
-void SDfileDate(uint16_t* date, uint16_t* time) {
- *date = FAT_DATE(year(), month(), day());
- *time = FAT_TIME(hour(), minute(), second());
-}
-
+#define src_h
 
 void printDateTime(time_t t){
     Serial << ((day(t)<10) ? "0" : "") << _DEC(day(t));
@@ -18,7 +11,7 @@ void printDateTime(time_t t){
 
 // function to return the compile date and time as a time_t value
 time_t compileTime(){
-    const time_t FUDGE(30);    //fudge factor to allow for upload time, etc. (seconds, YMMV)
+    const time_t FUDGE(20);    //fudge factor to allow for upload time, etc. (seconds, YMMV)
     const char *compDate = __DATE__, *compTime = __TIME__, *months = "JanFebMarAprMayJunJulAugSepOctNovDec";
     char compMon[4], *m;
 

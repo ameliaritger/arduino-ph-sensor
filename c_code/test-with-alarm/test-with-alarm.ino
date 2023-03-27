@@ -3,7 +3,7 @@
 
 #include <Adafruit_ADS1X15.h>
 #include <DS3232RTC.h>      // https://github.com/JChristensen/DS3232RTC
-#include <Streaming.h>      // https://github.com/janelia-arduino/Streaming
+#include <Streaming.h>      // https://github.com/janelia-arduino/Streaming , allows you to use << formatting
 #include <SPI.h>
 #include <SD.h>
 #include <Time.h>           // https://github.com/PaulStoffregen/Time
@@ -33,6 +33,13 @@ float average_samples_minus;
 int over_samples_minus;
 float sum_samples_minus;
 
+// Function to print a timestamp ("last modified") callback to the SD card
+void SDfileDate(uint16_t* date, uint16_t* time) {
+  setSyncProvider(rtc.get);
+  *date = FAT_DATE(year(), month(), day());
+  *time = FAT_TIME(hour(), minute(), second());
+}
+
 void setup()
 {
   pinMode(LED_BUILTIN, OUTPUT); // initialize digital pin 13 as an output (blink)
@@ -42,25 +49,25 @@ void setup()
   }
 
   // Setup SD card
-  Serial.print("Initializing SD card...");
+  Serial << "Initializing SD card..." << endl;
 
   if (!SD.begin(4)) {
-    Serial.println("sd card initialization failed!");
+    Serial << "sd card initialization failed!" << endl;
     while (1);
   }
 
-  Serial.println("sd card initialization done.");
+  Serial << "sd card initialization done." << endl;
 
   if (SD.exists(FILE_NAME)) { // If file already exists, don't add a header. If it doesn't exist, then write a header.
-    Serial.println("File exists, opening file...");
+    Serial << "File exists, opening file..." << endl;
   } else {
-    Serial.println("File doesn't exist, creating file and adding header");
-    Serial.println("Opening file...");
+    Serial << "File doesn't exist, creating file and adding header" << endl;
+    Serial << "Opening file..." << endl;
     datafile = SD.open(FILE_NAME, FILE_WRITE); // open the file
-    Serial.println("Writing header...");
-    datafile.println("Date,Time,J1 diff (mV),J1 oversampled (mV),J2+ (mV),J3 diff (mV),J4 oversampled (mV), J4 (mV), J4+ (mV),J4- (mV), J4+ oversampled (mV),J4- oversampled (mV)"); // removed "Coin battery (mV)"
+    Serial << "Writing header..." << endl;
+    datafile << "Date,Time,J1 diff (mV),J1 oversampled (mV),J2+ (mV),J3 diff (mV),J4 oversampled (mV), J4 (mV), J4+ (mV),J4- (mV), J4+ oversampled (mV),J4- oversampled (mV)" << endl; // removed "Coin battery (mV)"
     datafile.close(); // close the file
-    Serial.println("Done.");
+    Serial << "Done." << endl;
   }
 
   // Initialize the alarms, clear the alarm flags, clear the alarm interrupt flags
@@ -87,13 +94,13 @@ void setup()
   rtc.alarm(DS3232RTC::ALARM_2); // clear the alarm flag
 
   //Setup ADC 1015 and 1115
-  Serial.println("Getting differential reading from AIN0 (P) and AIN1 (N)");
-  Serial.println("ADC Range: +/- 4.096V (1 bit = 2mV)");
+  Serial << "Getting differential reading from AIN0 (P) and AIN1 (N)" << endl;
+  Serial << "ADC Range: +/- 4.096V (1 bit = 2mV)" << endl;
   ads1015.setGain(ADS1015_GAIN_VAL); // set Gain for ADC 1015
   ads1015.begin(0x48); // Initialize ads1015 at the default address 0x48
 
-  Serial.println("Getting differential reading from AIN0 (P) and AIN1 (N)");
-  Serial.println("ADC Range: +/- 1.024V (1 bit = 0.03125mV)");
+  Serial << "Getting differential reading from AIN0 (P) and AIN1 (N)" << endl;
+  Serial << "ADC Range: +/- 1.024V (1 bit = 0.03125mV)" << endl;
   ads1115.setGain(ADS1115_GAIN_VAL); // set Gain for ADC 1115
   ads1115.begin(0x49); // Initialize ads1115 at address 0x49
 }
@@ -104,7 +111,7 @@ void loop()
     ALARM_TRIGGER = true; // set alarm trigger to TRUE to trigger Alarm 1
     time_t t = rtc.get();
     formatTime(timestamp, t);
-    Serial << "ALARM_2 " << timestamp << endl; // print the time when this part of the loop is running
+    Serial << "IT'S TIME TO START SAMPLING! " << timestamp << endl; // print the time when this part of the loop is running
   }
 
   if (ALARM_TRIGGER && rtc.alarm(DS3232RTC::ALARM_1)) { // check alarm flag (and clear the flag if set)
@@ -112,41 +119,36 @@ void loop()
     formatTime(timestamp, t);
     time_t alarmTime = t + ALARM_INTERVAL; // calculate the next alarm time
     rtc.setAlarm(DS3232RTC::ALM1_MATCH_HOURS, second(alarmTime), minute(alarmTime), hour(alarmTime), 0); // set the alarm
-    Serial << " ALARM_1 " << timestamp << endl; // print the time when this part of the loop is running
+    Serial << "IT'S TIME TO SAMPLE! " << timestamp << endl; // print the time when this part of the loop is running
 
     SdFile::dateTimeCallback(SDfileDate); // Set file date and time on sd card ("last modified"). Check out this page if having issues: https://arduino.stackexchange.com/questions/39126/how-does-one-set-attributes-for-sd-files
     datafile = SD.open(FILE_NAME, FILE_WRITE); // open the file. note that only one file can be open at a time, so you have to close this one before opening another.
 
     if (datafile) { // if the file opened okay, write to it:
-      Serial.println("Writing to SD Card...");
-      datafile << timestamp << endl; // print date and time to datafile
-      tmElements_t tm; // check out SRC.h, may also be able to do time_t t and then day(t)
-      rtc.read(tm);
-      //date
-      datafile.print(tm.Year, DEC); datafile.print('/'); datafile.print(tm.Month, DEC); datafile.print('/'); datafile.print(tm.Day, DEC); datafile.print(',');
-      //time
-      datafile.print(tm.Hour, DEC); datafile.print(':'); datafile.print(tm.Minute, DEC); datafile.print(':'); datafile.print(tm.Second, DEC); datafile.print(',');
+      Serial << "Writing to SD Card..." << endl;
+      time_t TIME = rtc.get();
+      datafile << month(TIME) << "/" << day(TIME) << "/" << year(TIME) << "," << hour(TIME) << ":" << minute(TIME) << ":" << second(TIME) << "," ;
 
       // Read ADC1015 inputs
       int16_t adc1_1, adc1_diff; //adc1_2 for coin batt
       adc1_1 = ads1015.readADC_SingleEnded(2); // Read A2
-      Serial.print("J2+ : "); Serial.print(adc1_1); Serial.print("("); Serial.print(adc1_1 * ADS1015_GAIN_MULT); Serial.println("mV)");
+      Serial << "J2+: " << adc1_1 << "(" << adc1_1 * ADS1015_GAIN_MULT << "mV)" << endl;
       //adc1_2 = ads1015.readADC_SingleEnded(3); // Read A3
-      //Serial.print("coin batt : "); Serial.print(adc1_2); Serial.print("("); Serial.print(adc1_2 * ADS1015_GAIN_MULT); Serial.println("mV)");
+      //Serial << "coin batt: " << adc1_2 << "(" << adc1_2 * ADS1015_GAIN_MULT << "mV)" << endl;
       adc1_diff = ads1015.readADC_Differential_0_1(); //Read A0/A1 differential
-      Serial.print("J3 differential: "); Serial.print(adc1_diff); Serial.print("("); Serial.print(adc1_diff * ADS1015_GAIN_MULT); Serial.println("mV)");
+      Serial << "J3 differential: " << adc1_diff << "(" << adc1_diff * ADS1015_GAIN_MULT << "mV)" << endl;
 
       // Read ADC1115 inputs
       int16_t adc2_1, adc2_2, adc2_diff;
       adc2_1 = ads1115.readADC_SingleEnded(2); // Read A2
-      Serial.print("J4+ : "); Serial.print(adc2_1); Serial.print("("); Serial.print(adc2_1 * ADS1115_GAIN_MULT); Serial.println("mV)");
+      Serial << "J4+: " << adc2_1 << "(" << adc2_1 * ADS1115_GAIN_MULT << "mV)" << endl;
       adc2_2 = ads1115.readADC_SingleEnded(3); // Read A3
-      Serial.print("J4-: "); Serial.print(adc2_2); Serial.print("("); Serial.print(adc2_2 * ADS1115_GAIN_MULT); Serial.println("mV)");
+      Serial << "J4-: " << adc2_2 << "(" << adc2_2 * ADS1115_GAIN_MULT << "mV)" << endl;
       adc2_diff = ads1115.readADC_Differential_0_1(); // Read A0/A1 differential
-      Serial.print("J1 differential: "); Serial.print(adc2_diff); Serial.print("("); Serial.print(adc2_diff * ADS1115_GAIN_MULT); Serial.println("mV)");
+      Serial << "J1 differential: " << adc2_diff << "(" << adc2_diff * ADS1115_GAIN_MULT << "mV)" << endl;
 
       // Oversampling J1+
-      over_samples_one = sampleRate;
+      over_samples_one = OVERSAMPLE_RATE;
       sum_samples_one = 0;
       for (int i = 0; i < over_samples_one; i++) {
         int a = ads1115.readADC_Differential_0_1();
@@ -156,7 +158,7 @@ void loop()
       average_samples_one = sum_samples_one / over_samples_one;
 
       // Oversampling J4+
-      over_samples_plus = sampleRate;
+      over_samples_plus = OVERSAMPLE_RATE;
       sum_samples_plus = 0;
       for (int i = 0; i < over_samples_plus; i++) {
         int a = ads1115.readADC_SingleEnded(2);
@@ -166,7 +168,7 @@ void loop()
       average_samples_plus = sum_samples_plus / over_samples_plus;
 
       // Oversampling J4-
-      over_samples_minus = sampleRate;
+      over_samples_minus = OVERSAMPLE_RATE;
       sum_samples_minus = 0;
       for (int i = 0; i < over_samples_minus; i++) {
         int a = ads1115.readADC_SingleEnded(3);
@@ -175,28 +177,24 @@ void loop()
       }
       average_samples_minus = sum_samples_minus / over_samples_minus;
 
-      Serial.print("J4+ oversampled: "); Serial.print(average_samples_plus); Serial.print("("); Serial.print(average_samples_plus * ADS1115_GAIN_MULT); Serial.println("mV)");
-      Serial.print("J4- oversampled: "); Serial.print(average_samples_minus); Serial.print("("); Serial.print(average_samples_minus * ADS1115_GAIN_MULT); Serial.println("mV)");
-      Serial.print("J1 oversampled: "); Serial.print(average_samples_one); Serial.print("("); Serial.print(average_samples_one * ADS1115_GAIN_MULT); Serial.println("mV)");
-
+      Serial << "J4+ oversampled: " << average_samples_plus << "(" << average_samples_plus * ADS1115_GAIN_MULT << "mV)" << endl;
+      Serial << "J4- oversampled: " << average_samples_minus << "(" << average_samples_minus * ADS1115_GAIN_MULT << "mV)" << endl;
+      Serial << "J1 oversampled: " << average_samples_one << "(" << average_samples_one * ADS1115_GAIN_MULT << "mV)" << endl;
+      
       // Write ADC inputs
-      datafile.print(adc2_diff * ADS1115_GAIN_MULT); datafile.print(','); //J1+
-      datafile.print(average_samples_one * ADS1115_GAIN_MULT); datafile.print(','); //J1+ oversampled
-      datafile.print(adc1_1 * ADS1015_GAIN_MULT); datafile.print(','); //J2+
-      datafile.print(adc1_diff * ADS1015_GAIN_MULT); datafile.print(','); //J3+
-      datafile.print((average_samples_plus * ADS1115_GAIN_MULT) - (average_samples_minus * ADS1115_GAIN_MULT)); datafile.print(','); //J4 oversampled
-      datafile.print((adc2_1 * ADS1115_GAIN_MULT) - (adc2_2 * ADS1115_GAIN_MULT)); datafile.print(','); //J4
-      datafile.print(adc2_1 * ADS1115_GAIN_MULT); datafile.print(','); //J4+
-      datafile.print(adc2_2 * ADS1115_GAIN_MULT); datafile.print(','); //J4-
-      datafile.print(average_samples_plus * ADS1115_GAIN_MULT); datafile.print(','); //J4+ oversampled
-      datafile.print(average_samples_minus * ADS1115_GAIN_MULT); datafile.print(','); //J4- oversampled
+      datafile << adc2_diff * ADS1115_GAIN_MULT << "," << average_samples_one * ADS1115_GAIN_MULT << ","; //J1
+      datafile << adc1_1 * ADS1015_GAIN_MULT << ","; //J2
+      datafile << adc1_diff * ADS1015_GAIN_MULT << ","; //J3
+      datafile << (average_samples_plus * ADS1115_GAIN_MULT) - (average_samples_minus * ADS1115_GAIN_MULT) << "," << (adc2_1 * ADS1115_GAIN_MULT) - (adc2_2 * ADS1115_GAIN_MULT) << ","; //J4
+      datafile << adc2_1 * ADS1115_GAIN_MULT << "," << adc2_2 * ADS1115_GAIN_MULT << ","; //J4+ and J4-
+      datafile << average_samples_plus * ADS1115_GAIN_MULT << "," << average_samples_minus * ADS1115_GAIN_MULT << endl; //J4+ and J4- oversampled
       //datafile.println(adc1_2 * ADS1015_GAIN_MULT); //coin batt
 
       // close the file:
       datafile.close();
     } else {
       // if the file didn't open, print an error:
-      Serial.println("error writing to file");
+      Serial << "error writing to file" << endl;
     }
 
     // if the LED is off turn it on and vice-versa:
