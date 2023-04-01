@@ -11,7 +11,7 @@ void printDateTime(time_t t) {
 
 // function to return the compile date and time as a time_t value
 time_t compileTime() {
-  const time_t FUDGE(20);    //fudge factor to allow for upload time, etc. (seconds, YMMV)
+  const time_t FUDGE(15);    //fudge factor to allow for upload time, etc. (seconds, YMMV)
   const char *compDate = __DATE__, *compTime = __TIME__, *months = "JanFebMarAprMayJunJulAugSepOctNovDec";
   char compMon[4], *m;
 
