@@ -9,6 +9,36 @@ void printDateTime(time_t t) {
   Serial << ((second(t) < 10) ? "0" : "") << _DEC(second(t));
 }
 
+// Calculate mean value from oversampling
+float sampleMean(int oversampleArray[OVERSAMPLE_VALUE]) { // or replace this with int oversampleArray[]
+  long sum = 0L; //
+  for (int i = 0; i < OVERSAMPLE_VALUE; i++) {
+    sum += oversampleArray[i];
+    //Serial.println(oversampleArray[i]); 
+  }
+  float mean = sum / OVERSAMPLE_VALUE;
+  return mean;
+}
+
+// Calculate minimum value from oversampling
+int sampleMin(int oversampleArray[OVERSAMPLE_VALUE]) { // or replace this with int* oversampleArrayPointer
+  int minVal = oversampleArray[0]; // Initialize an array to store min value
+  for (int i = 0; i < OVERSAMPLE_VALUE; i++) {
+    minVal = min(oversampleArray[i], minVal);
+    //Serial.println(oversampleArray[i]); 
+  }
+  return minVal;
+}
+
+// Calculate maximum value from oversampling
+int sampleMax(int oversampleArray[OVERSAMPLE_VALUE]) { // or replace this with int oversampleArray[OVERSAMPLE_VALUE]
+  int maxVal = oversampleArray[0]; // Initialize an array to store min value
+  for (int i = 0; i < OVERSAMPLE_VALUE; i++) {
+    maxVal = max(oversampleArray[i], maxVal);
+  }
+  return maxVal;
+}
+
 // function to return the compile date and time as a time_t value
 time_t compileTime() {
   const time_t FUDGE(15);    //fudge factor to allow for upload time, etc. (seconds, YMMV)

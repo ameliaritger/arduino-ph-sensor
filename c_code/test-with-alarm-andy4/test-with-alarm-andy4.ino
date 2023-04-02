@@ -25,9 +25,12 @@ Adafruit_ADS1115 ads1115; // Construct an ads1115
 const int ledPin = LED_BUILTIN;
 int ledState = LOW; // ledState used to set the LED
 char timestamp[32]; // Current time from the RTC in text format, 32 bytes long
-bool alarmTrigger = false; // Create variable set to FALSE for alarm nesting
+bool alarmTrigger = false; // Create variable set to FALSE for alarm nesting. set to TRUE if you want immediate sampling!
 
 int oversampleArray[OVERSAMPLE_VALUE]; // generate array for oversampling
+float oversampleMean;
+int oversampleMin;
+int oversampleMax;
 
 // Function to print a timestamp ("last modified") callback to the SD card
 void SDfileDate(uint16_t* date, uint16_t* time) {
@@ -38,10 +41,8 @@ void SDfileDate(uint16_t* date, uint16_t* time) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-//void oversample(Adafruit_ADS1115* ads1115Pointer, int oversampleArray[], int input) {
 void oversample(Adafruit_ADS1115* ads1115Pointer, int oversampleArray[OVERSAMPLE_VALUE], int input) {
   ads1115 = *ads1115Pointer;
-  //oversampleArray = *oversampleArrayPointer;
   for (int i = 0; i < OVERSAMPLE_VALUE; i++) {
     if ((input == 2) || (input == 3)) {
       int adcValue = ads1115.readADC_SingleEnded(input);
@@ -52,37 +53,6 @@ void oversample(Adafruit_ADS1115* ads1115Pointer, int oversampleArray[OVERSAMPLE
       oversampleArray[i] = adcValue;
     }
   }
-}
-
-// Calculate mean value from oversampling
-float sampleMean(int oversampleArray[OVERSAMPLE_VALUE]) { // or replace this with int oversampleArray[]
-  int sum;
-  //oversampleArray = *oversampleArrayPointer;
-  for (int i = 0; i < OVERSAMPLE_VALUE; i++) {
-    sum += oversampleArray[i];
-  }
-  float mean = sum / OVERSAMPLE_VALUE;
-  return mean;
-}
-
-// Calculate minimum value from oversampling
-int sampleMin(int oversampleArray[OVERSAMPLE_VALUE]) { // or replace this with int* oversampleArrayPointer
-  //oversampleArray = *oversampleArrayPointer;
-  int minVal = oversampleArray[0]; // Initialize an array to store min value
-  for (int i = 0; i < OVERSAMPLE_VALUE; i++) {
-    minVal = min(oversampleArray[i], minVal);
-  }
-  return minVal;
-}
-
-// Calculate maximum value from oversampling
-int sampleMax(int oversampleArray[OVERSAMPLE_VALUE]) { // or replace this with int oversampleArray[OVERSAMPLE_VALUE]
-  //oversampleArray = *oversampleArrayPointer;
-  int maxVal = oversampleArray[0]; // Initialize an array to store min value
-  for (int i = 0; i < OVERSAMPLE_VALUE; i++) {
-    maxVal = max(oversampleArray[i], maxVal);
-  }
-  return maxVal;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -168,7 +138,7 @@ void loop()
     Serial << "ALARM_2 " << timestamp << endl; // print the time when this part of the loop is running
   }
 
-  if (rtc.alarm(DS3232RTC::ALARM_1)) { // check alarm flag (and clear the flag if set)
+  if (alarmTrigger && rtc.alarm(DS3232RTC::ALARM_1)) { // check alarm flag (and clear the flag if set)
     time_t t = rtc.get(); // get the current time
     formatTime(timestamp, t);
     time_t alarmTime = t + ALARM_INTERVAL; // calculate the next alarm time
@@ -202,17 +172,30 @@ void loop()
       Serial << "J1 differential: " << adc2_diff << "(" << adc2_diff * ADS1115_GAIN_MULT << "mV)" << endl;
 
       ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-      // Need to add oversampling code here, once it's figured out
-
       oversample(&ads1115, oversampleArray, 2);
-      //float meanJ4plus = sampleMean(oversample(&ads1115, oversampleArray, 2));
-      
+      oversampleMean = sampleMean(oversampleArray);
+      oversampleMin = sampleMin(oversampleArray);
+      oversampleMax = sampleMax(oversampleArray);
+      Serial << "J4+ oversampled mean: " << oversampleMean << ", " << oversampleMean * ADS1115_GAIN_MULT << "mV)" << endl;
+      Serial << "J4+ oversampled min: " << oversampleMin << ", " << oversampleMin * ADS1115_GAIN_MULT << "mV" << endl;
+      Serial << "J4+ oversampled max: " << oversampleMax << ", " << oversampleMax * ADS1115_GAIN_MULT << "mV" << endl;
+
       oversample(&ads1115, oversampleArray, 3);
-      float meanJ4minus = sampleMean(oversampleArray);
+      oversampleMean = sampleMean(oversampleArray);
+      oversampleMin = sampleMin(oversampleArray);
+      oversampleMax = sampleMax(oversampleArray);
+      Serial << "J4- oversampled mean: " << oversampleMean << ", " << oversampleMean * ADS1115_GAIN_MULT << "mV)" << endl;
+      Serial << "J4- oversampled min: " << oversampleMin << ", " << oversampleMin * ADS1115_GAIN_MULT << "mV" << endl;
+      Serial << "J4- oversampled max: " << oversampleMax << ", " << oversampleMax * ADS1115_GAIN_MULT << "mV" << endl;
 
       oversample(&ads1115, oversampleArray, 0);
-      float meanJ1 = sampleMean(oversampleArray);
-      
+      oversampleMean = sampleMean(oversampleArray);
+      oversampleMin = sampleMin(oversampleArray);
+      oversampleMax = sampleMax(oversampleArray);
+      Serial << "J1 oversampled mean: " << oversampleMean << ", " << oversampleMean * ADS1115_GAIN_MULT << "mV" << endl;
+      Serial << "J1 oversampled min: " << oversampleMin << ", " << oversampleMin * ADS1115_GAIN_MULT << "mV" << endl;
+      Serial << "J1 oversampled max: " << oversampleMax << ", " << oversampleMax * ADS1115_GAIN_MULT << "mV" << endl;
+
       //Serial << "J4+ oversampled: " << average_samples_plus << "(" << average_samples_plus * ADS1115_GAIN_MULT << "mV)" << endl;
       //Serial << "J4- oversampled: " << average_samples_minus << "(" << average_samples_minus * ADS1115_GAIN_MULT << "mV)" << endl;
       //Serial << "J1 oversampled: " << average_samples_one << "(" << average_samples_one * ADS1115_GAIN_MULT << "mV)" << endl;

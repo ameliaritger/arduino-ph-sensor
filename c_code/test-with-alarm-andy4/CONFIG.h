@@ -4,9 +4,9 @@
 #define FILE_NAME "test-12.csv" //KEEP THIS AT OR UNDER 8 CHARACTERS, not including '.csv' extension
 
 constexpr time_t ALARM_INTERVAL {10};   // alarm interval (in seconds)
-constexpr time_t START_DAY {31};   // set the day of the month start time (1-31)
-constexpr time_t START_HOUR {14};   // set the hours start time (0-23)
-constexpr time_t START_MIN {14};   // set the minutes start time (0-59)
+constexpr time_t START_DAY {1};   // set the day of the month start time (1-31)
+constexpr time_t START_HOUR {19};   // set the hours start time (0-23)
+constexpr time_t START_MIN {41};   // set the minutes start time (0-59)
 
 #define OVERSAMPLE_VALUE 64 // set oversampling value. DEFAULT: 64. options: 16, 64, and 256 //add 1000,2000,7000 (seconds) to delayTime for total sampling rate
 
