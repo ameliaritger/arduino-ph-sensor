@@ -8,7 +8,7 @@ constexpr time_t START_DAY {31};   // set the day of the month start time (1-31)
 constexpr time_t START_HOUR {14};   // set the hours start time (0-23)
 constexpr time_t START_MIN {14};   // set the minutes start time (0-59)
 
-int OVERSAMPLE_RATE = 64; // set oversampling rate. DEFAULT: 64. options: 16, 64, and 256 //add 1000,2000,7000 (seconds) to delayTime for total sampling rate
+#define OVERSAMPLE_VALUE 64 // set oversampling value. DEFAULT: 64. options: 16, 64, and 256 //add 1000,2000,7000 (seconds) to delayTime for total sampling rate
 
 // Set ADC gain values. DO NOT CHANGE, see table below for reference.
 #define ADS1015_GAIN_VAL GAIN_TWOTHIRDS   // Recommended: GAIN_ONE
