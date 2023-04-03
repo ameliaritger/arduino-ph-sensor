@@ -39,6 +39,27 @@ int sampleMax(int oversampleArray[OVERSAMPLE_VALUE]) { // or replace this with i
   return maxVal;
 }
 
+// Calculate variance from oversampling
+int sampleVariance(int oversampleArray[OVERSAMPLE_VALUE]) {
+  // Compute mean
+  long sum = 0L; //
+  for (int i = 0; i < OVERSAMPLE_VALUE; i++) {
+    sum += oversampleArray[i];
+  }
+  float mean = sum / OVERSAMPLE_VALUE;
+  // Compute sum squared differences
+  double sqDiff = 0;
+  for (int i = 0; i < OVERSAMPLE_VALUE; i++)
+    sqDiff += (oversampleArray[i] - mean) *
+              (oversampleArray[i] - mean);
+  return sqDiff / OVERSAMPLE_VALUE;
+}
+
+// Calculate standard deviation from oversampling
+double sampleSD(int oversampleArray[OVERSAMPLE_VALUE]) {
+  return sqrt(sampleVariance(oversampleArray));
+}
+
 // function to return the compile date and time as a time_t value
 time_t compileTime() {
   const time_t FUDGE(15);    //fudge factor to allow for upload time, etc. (seconds, YMMV)
