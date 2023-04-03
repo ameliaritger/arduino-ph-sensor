@@ -1,0 +1,113 @@
+---
+title: "Plotting oversampling data"
+author: "Amelia Ritger"
+date: "2023-04-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+library(janitor)
+```
+
+Justify oversampling rate
+```{r}
+pathname <- "./data/oversample/" #name the file pathway (i.e., where in the directy the files are stored)
+file_names <- list.files(path = pathname, 
+                         full.names = F,
+                         pattern='*.CSV') #get a list of the names of the files (only .xlsx)
+
+# To upload files individually
+#for (temp_name in file_names){
+#  file.temp <- read_csv(paste0(pathname, temp_name))
+#  assign(gsub(".csv", "", temp_name, fixed = T), file.temp)
+#}
+
+all_merged <- read_csv(here("data", "oversample", file_names), col_names = TRUE) %>%
+  clean_names() %>%
+  select(2,1,7:10,15:18,21:24) %>%
+  setNames(c("Time", "Rate", "J1 Mean", "J1 min", "J1 max", "J1 SD", "J4plus Mean", "J4plus min", "J4plus max", "J4plus SD", "J4minus Mean", "J4minus min", "J4minus max", "J4minus SD")) %>%
+  mutate(Rate = as.factor(Rate))
+
+#Group then plot
+plot_long <- all_merged %>%
+  arrange(Time) %>%
+  group_by(Rate) %>%
+  pivot_longer(cols = 3:14,
+               names_to = "name",
+               values_to = "value") %>%
+  separate(name, c("Pin", "name")) %>%
+  filter(!Pin == "J4minus",
+         !name %in% c("min", "max")) %>%
+  mutate(Pin = ifelse(Pin == "J1", "J1", "J4"))
+
+#plot means plus SDs
+ggplot(plot_long, aes(x=Time, y=value, group=Rate)) +
+  geom_point(aes(color=Rate)) +
+  facet_grid2(vars(name), vars(Pin), scales="free_y", independent="y") +
+  labs(y="Bits")
+
+plot_wide <- plot_long %>%
+  pivot_wider(names_from=name, values_from = value) %>%
+  mutate(Pin = as.factor(Pin))
+
+#plot lines
+ggplot(plot_wide, aes(x=Time, y=SD, group=Rate)) +
+  geom_point(aes(color=Rate)) +
+  geom_smooth(aes(color=Rate),method='lm', formula= y~x, se=FALSE) +
+  facet_wrap(~Pin, scales="free") +
+  labs(y="Standard deviation (bits)")
+
+plot_j1 <- plot_wide %>%
+  filter(Pin=="J1")
+hist(plot_j1$SD)
+cor(plot_j1$SD, plot_j1$Time)
+
+plot_j4 <- plot_wide %>%
+  filter(Pin=="J4")
+hist(plot_j4$SD)
+
+cor(plot_j4$SD, plot_j4$Time)
+
+sample_lm = lm(data=plot_wide, SD~Time+Rate+Pin)
+summary(sample_lm)
+
+#plot boxplots
+ggplot(plot_wide, aes(x=Rate, y=SD)) +
+  geom_boxplot(aes(color=Rate)) +
+  geom_point(aes(color=Rate), alpha=0.2) +
+  facet_wrap(~Pin, scales = "free") +
+  labs(y="Standard deviation (bits)") +
+  theme(legend.position = "none")
+
+sample_anova <-aov(data=plot_wide,SD~Rate+Pin)
+summary(sample_anova)
+TukeyHSD(sample_anova, which="Rate")
+```
+
+Justify oversampling at all
+```{r}
+all_comp <- read_csv(here("data", "oversample", file_names), col_names = TRUE) %>%
+  clean_names() %>%
+  select(2,1,5:6, 13:14,19:20) %>%
+  setNames(c("Time", "Rate", "J1 point","J1 oversampled", "J4plus point","J4plus oversampled","J4minus point","J4minus oversampled")) %>%
+  mutate(Rate = as.factor(Rate)) %>%
+  filter(Rate == "64")
+
+#Group then plot
+comp_long <- all_comp %>%
+  arrange(Time) %>%
+  pivot_longer(cols = 3:8,
+               names_to = "name",
+               values_to = "value") %>%
+  separate(name, c("Pin", "name"))
+
+#plot means plus SDs
+ggplot(comp_long, aes(x=Time, y=value, group=name)) +
+  geom_line(aes(color=name)) +
+  facet_wrap(~Pin, scales="free_y") +
+  labs(y="Voltage (mV)")
+```
+
