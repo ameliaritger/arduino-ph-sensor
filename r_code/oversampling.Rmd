@@ -102,12 +102,25 @@ comp_long <- all_comp %>%
   pivot_longer(cols = 3:8,
                names_to = "name",
                values_to = "value") %>%
-  separate(name, c("Pin", "name"))
+  separate(name, c("Pin", "name")) %>%
+  group_by(Pin) %>%
+  filter(if ('J4minus' %in% Pin) between(value,51.6,51.67) else TRUE) %>% #remove the three super anomaly points for J4-, would've filtered them out anyway
+  ungroup() %>%
+  filter(!Pin=="J4minus") %>% #remove J4- pin
+  mutate(name = ifelse(name == "point", "Sample (1x)", "Oversampled (64x)"),
+         Pin = ifelse(Pin == "J1", "J1", ifelse(Pin == "J4plus", "J4+", "J4-")))
 
 #plot means plus SDs
 ggplot(comp_long, aes(x=Time, y=value, group=name)) +
-  geom_line(aes(color=name)) +
+  geom_line(data = subset(comp_long, name == "Sample (1x)"), aes(color=name)) +
+  geom_line(data = subset(comp_long, name == "Oversampled (64x)"), aes(color=name)) +
+  scale_color_manual(values = c("#0072B2", "#E69F00")) +
   facet_wrap(~Pin, scales="free_y") +
-  labs(y="Voltage (mV)")
+  labs(y="Voltage (mV)", color = "") +
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20))
+
+#ggsave(here("figures", "final", "oversample_nominus.png"), height=15, width=25, units="cm")
 ```
 
