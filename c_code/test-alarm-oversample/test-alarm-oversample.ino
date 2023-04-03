@@ -26,12 +26,13 @@ Adafruit_ADS1115 ads1115; // Construct an ads1115
 const int ledPin = LED_BUILTIN;
 int ledState = LOW; // ledState used to set the LED
 char timestamp[32]; // Current time from the RTC in text format, 32 bytes long
-bool alarmTrigger = false; // Create variable set to false for alarm nesting. Set to true if you want immediate start time.
+bool alarmTrigger = true; // Create variable set to false for alarm nesting. Set to true if you want immediate start time.
 
 int16_t adc2_1, adc2_2, adc2_diff, adc1_1, adc1_diff; //adc1_2 for coin batt
 int oversampleArray[OVERSAMPLE_VALUE]; // generate array for oversampling
 int oversampleMin, oversampleMax;
 float oversampleMean;
+double oversampleSD;
 
 // Function to print a timestamp ("last modified") callback to the SD card
 void SDfileDate(uint16_t* date, uint16_t* time) {
@@ -79,7 +80,7 @@ void setup()
     Serial << "Opening file..." << endl;
     datafile = SD.open(FILE_NAME, FILE_WRITE); // open the file
     Serial << "Writing header..." << endl;
-    datafile << "Date,Time,J1 (mV),J1 oversampled mean (mV),J1 oversampled min (mV),J1 oversampled max (mV),J2+ (mV),J3 (mV),J4+ (mV),J4+ oversampled mean (mV),J4+ oversampled min (mV),J4+ oversampled max (mV),J4- (mV),J4- oversampled mean (mV),J4- oversampled min (mV),J4- oversampled max (mV)" << endl; // removed "Coin battery (mV)"
+    datafile << "Date,Time,J1 (mV),J1 oversampled mean (mV),J1 oversampled min (mV),J1 oversampled max (mV),J1 oversampled sd (mV),J2+ (mV),J3 (mV),J4+ (mV),J4+ oversampled mean (mV),J4+ oversampled min (mV),J4+ oversampled max (mV),J4+ oversampled sd (mV),J4- (mV),J4- oversampled mean (mV),J4- oversampled min (mV),J4- oversampled max (mV),J4- oversampled sd (mV)" << endl; // removed "Coin battery (mV)"
     datafile.close(); // close the file
     Serial << "Done." << endl;
   }
@@ -159,10 +160,11 @@ void loop()
       oversampleMean = sampleMean(oversampleArray);
       oversampleMin = sampleMin(oversampleArray);
       oversampleMax = sampleMax(oversampleArray);
+      oversampleSD = sampleSD(oversampleArray);
       Serial << "J1 oversampled mean: " << oversampleMean << ", " << oversampleMean * ADS1115_GAIN_MULT << "mV" << endl;
       Serial << "J1 oversampled min: " << oversampleMin << ", " << oversampleMin * ADS1115_GAIN_MULT << "mV" << endl;
       Serial << "J1 oversampled max: " << oversampleMax << ", " << oversampleMax * ADS1115_GAIN_MULT << "mV" << endl;
-      datafile << adc2_diff * ADS1115_GAIN_MULT << "," << oversampleMean * ADS1115_GAIN_MULT << "," << oversampleMin * ADS1115_GAIN_MULT << "," << oversampleMax * ADS1115_GAIN_MULT << ","; //J1
+      datafile << adc2_diff * ADS1115_GAIN_MULT << "," << oversampleMean * ADS1115_GAIN_MULT << "," << oversampleMin * ADS1115_GAIN_MULT << "," << oversampleMax * ADS1115_GAIN_MULT << "," << oversampleSD << ","; //J1
 
       adc1_1 = ads1015.readADC_SingleEnded(2); // Read J2 pin (A2)
       Serial << "J2+: " << adc1_1 << "(" << adc1_1 * ADS1015_GAIN_MULT << "mV)" << endl;
@@ -181,10 +183,11 @@ void loop()
       oversampleMean = sampleMean(oversampleArray);
       oversampleMin = sampleMin(oversampleArray);
       oversampleMax = sampleMax(oversampleArray);
+      oversampleSD = sampleSD(oversampleArray);
       Serial << "J4+ oversampled mean: " << oversampleMean << ", " << oversampleMean * ADS1115_GAIN_MULT << "mV)" << endl;
       Serial << "J4+ oversampled min: " << oversampleMin << ", " << oversampleMin * ADS1115_GAIN_MULT << "mV" << endl;
       Serial << "J4+ oversampled max: " << oversampleMax << ", " << oversampleMax * ADS1115_GAIN_MULT << "mV" << endl;
-      datafile << adc2_1 * ADS1115_GAIN_MULT << "," << oversampleMean * ADS1115_GAIN_MULT << "," << oversampleMin * ADS1115_GAIN_MULT << "," << oversampleMax * ADS1115_GAIN_MULT << ","; //J4+
+      datafile << adc2_1 * ADS1115_GAIN_MULT << "," << oversampleMean * ADS1115_GAIN_MULT << "," << oversampleMin * ADS1115_GAIN_MULT << "," << oversampleMax * ADS1115_GAIN_MULT << "," << oversampleSD << ","; //J4+
 
       adc2_2 = ads1115.readADC_SingleEnded(3); // Read A3
       Serial << "J4-: " << adc2_2 << "(" << adc2_2 * ADS1115_GAIN_MULT << "mV)" << endl;
@@ -192,10 +195,11 @@ void loop()
       oversampleMean = sampleMean(oversampleArray);
       oversampleMin = sampleMin(oversampleArray);
       oversampleMax = sampleMax(oversampleArray);
+      oversampleSD = sampleSD(oversampleArray);
       Serial << "J4- oversampled mean: " << oversampleMean << ", " << oversampleMean * ADS1115_GAIN_MULT << "mV)" << endl;
       Serial << "J4- oversampled min: " << oversampleMin << ", " << oversampleMin * ADS1115_GAIN_MULT << "mV" << endl;
       Serial << "J4- oversampled max: " << oversampleMax << ", " << oversampleMax * ADS1115_GAIN_MULT << "mV" << endl;
-      datafile << adc2_2 * ADS1115_GAIN_MULT << "," << oversampleMean * ADS1115_GAIN_MULT << "," << oversampleMin * ADS1115_GAIN_MULT << "," << oversampleMax * ADS1115_GAIN_MULT << endl; //J4-
+      datafile << adc2_2 * ADS1115_GAIN_MULT << "," << oversampleMean * ADS1115_GAIN_MULT << "," << oversampleMin * ADS1115_GAIN_MULT << "," << oversampleMax * ADS1115_GAIN_MULT << "," << oversampleSD << endl; //J4-
 
       ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -211,6 +215,6 @@ void loop()
     delay(1000); // keep LED on for 1 second
     digitalWrite(ledPin, LOW); // turn LED off
 
-    //LowPower.deepSleep(5000); // deep sleep for 5 seconds. This will break the Serial, but will still log. Maybe do deep sleep?
+    //LowPower.deepSleep(5000); // deep sleep for 5 seconds. This will break the Serial, but the loop will still be running.
   }
 }
