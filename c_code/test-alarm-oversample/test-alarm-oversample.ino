@@ -80,7 +80,7 @@ void setup()
     Serial << "Opening file..." << endl;
     datafile = SD.open(FILE_NAME, FILE_WRITE); // open the file
     Serial << "Writing header..." << endl;
-    datafile << "Date,Time,J1 (mV),J1 oversampled mean (mV),J1 oversampled min (mV),J1 oversampled max (mV),J1 oversampled sd (mV),J2+ (mV),J3 (mV),J4+ (mV),J4+ oversampled mean (mV),J4+ oversampled min (mV),J4+ oversampled max (mV),J4+ oversampled sd (mV),J4- (mV),J4- oversampled mean (mV),J4- oversampled min (mV),J4- oversampled max (mV),J4- oversampled sd (mV)" << endl; // removed "Coin battery (mV)"
+    datafile << "Date,Time,J1 (mV),J1 oversampled mean (mV),J1 oversampled mean,J1 oversampled min,J1 oversampled max,J1 oversampled sd,J2+ (mV),J3 (mV),J4+ (mV),J4+ oversampled mean (mV),J4+ oversampled mean,J4+ oversampled min,J4+ oversampled max,J4+ oversampled sd,J4- (mV),J4- oversampled mean (mV),J4- oversampled mean,J4- oversampled min,J4- oversampled max,J4- oversampled sd" << endl; // removed "Coin battery (mV)"
     datafile.close(); // close the file
     Serial << "Done." << endl;
   }
@@ -164,14 +164,15 @@ void loop()
       Serial << "J1 oversampled mean: " << oversampleMean << ", " << oversampleMean * ADS1115_GAIN_MULT << "mV" << endl;
       Serial << "J1 oversampled min: " << oversampleMin << ", " << oversampleMin * ADS1115_GAIN_MULT << "mV" << endl;
       Serial << "J1 oversampled max: " << oversampleMax << ", " << oversampleMax * ADS1115_GAIN_MULT << "mV" << endl;
-      datafile << adc2_diff * ADS1115_GAIN_MULT << "," << oversampleMean * ADS1115_GAIN_MULT << "," << oversampleMin * ADS1115_GAIN_MULT << "," << oversampleMax * ADS1115_GAIN_MULT << "," << oversampleSD << ","; //J1
+      Serial << "variance: " << oversampleSD << ", " << oversampleSD * ADS1115_GAIN_MULT << "mV" << endl;
+      datafile << adc2_diff * ADS1115_GAIN_MULT << "," << oversampleMean * ADS1115_GAIN_MULT << "," << oversampleMean << "," << oversampleMin << "," << oversampleMax << "," << oversampleSD << ","; //J1
 
       adc1_1 = ads1015.readADC_SingleEnded(2); // Read J2 pin (A2)
       Serial << "J2+: " << adc1_1 << "(" << adc1_1 * ADS1015_GAIN_MULT << "mV)" << endl;
       datafile << adc1_1 * ADS1015_GAIN_MULT << ","; //J2
 
       adc1_diff = ads1015.readADC_Differential_0_1(); //Read J3 pin (A0/A1 differential)
-      Serial << "J3 differential: " << adc1_diff << "(" << adc1_diff * ADS1015_GAIN_MULT << "mV)" << endl;
+      Serial << "J3 differential: " << adc1_diff << "(" << adc1_diff * ADS1015_GAIN_MULT << "mV" << endl;
       datafile << adc1_diff * ADS1015_GAIN_MULT << ","; //J3
 
       //adc1_2 = ads1015.readADC_SingleEnded(3); // Read A3 AKA coin batt
@@ -184,10 +185,11 @@ void loop()
       oversampleMin = sampleMin(oversampleArray);
       oversampleMax = sampleMax(oversampleArray);
       oversampleSD = sampleSD(oversampleArray);
-      Serial << "J4+ oversampled mean: " << oversampleMean << ", " << oversampleMean * ADS1115_GAIN_MULT << "mV)" << endl;
+      Serial << "J4+ oversampled mean: " << oversampleMean << ", " << oversampleMean * ADS1115_GAIN_MULT << "mV" << endl;
       Serial << "J4+ oversampled min: " << oversampleMin << ", " << oversampleMin * ADS1115_GAIN_MULT << "mV" << endl;
       Serial << "J4+ oversampled max: " << oversampleMax << ", " << oversampleMax * ADS1115_GAIN_MULT << "mV" << endl;
-      datafile << adc2_1 * ADS1115_GAIN_MULT << "," << oversampleMean * ADS1115_GAIN_MULT << "," << oversampleMin * ADS1115_GAIN_MULT << "," << oversampleMax * ADS1115_GAIN_MULT << "," << oversampleSD << ","; //J4+
+      Serial << "variance: " << oversampleSD << ", " << oversampleSD * ADS1115_GAIN_MULT << "mV" << endl;
+      datafile << adc2_1 * ADS1115_GAIN_MULT << "," << oversampleMean * ADS1115_GAIN_MULT << "," << oversampleMean << "," << oversampleMin << "," << oversampleMax << "," << oversampleSD << ","; //J4+
 
       adc2_2 = ads1115.readADC_SingleEnded(3); // Read A3
       Serial << "J4-: " << adc2_2 << "(" << adc2_2 * ADS1115_GAIN_MULT << "mV)" << endl;
@@ -196,10 +198,11 @@ void loop()
       oversampleMin = sampleMin(oversampleArray);
       oversampleMax = sampleMax(oversampleArray);
       oversampleSD = sampleSD(oversampleArray);
-      Serial << "J4- oversampled mean: " << oversampleMean << ", " << oversampleMean * ADS1115_GAIN_MULT << "mV)" << endl;
+      Serial << "J4- oversampled mean: " << oversampleMean << ", " << oversampleMean * ADS1115_GAIN_MULT << "mV" << endl;
       Serial << "J4- oversampled min: " << oversampleMin << ", " << oversampleMin * ADS1115_GAIN_MULT << "mV" << endl;
       Serial << "J4- oversampled max: " << oversampleMax << ", " << oversampleMax * ADS1115_GAIN_MULT << "mV" << endl;
-      datafile << adc2_2 * ADS1115_GAIN_MULT << "," << oversampleMean * ADS1115_GAIN_MULT << "," << oversampleMin * ADS1115_GAIN_MULT << "," << oversampleMax * ADS1115_GAIN_MULT << "," << oversampleSD << endl; //J4-
+      Serial << "variance: " << oversampleSD << ", " << oversampleSD * ADS1115_GAIN_MULT << "mV" << endl;
+      datafile << adc2_2 * ADS1115_GAIN_MULT << "," << oversampleMean * ADS1115_GAIN_MULT << "," << oversampleMean << "," << oversampleMin << "," << oversampleMax << "," << oversampleSD << endl; //J4-
 
       ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
