@@ -25,18 +25,33 @@ all_merged <- read_csv(here("data", "OVERSAMP.CSV"), col_names = TRUE) %>%
 
 #Group then plot
 plot_long <- all_merged %>%
+  mutate(time_point = seq(1:nrow(all_merged))) %>%
   pivot_longer(cols=c(3,4, 7, 10,11, 14), names_to="name", values_to="value") %>%
-  select(1:2, 11:12) %>%
-  mutate(rate = ifelse(str_detect(name, "64"), 64, 256))
+  select(1:2, 10:13) %>%
+  mutate(rate = as.factor(ifelse(str_detect(name, "64"), 64,
+                       ifelse(str_detect(name, "256"), 256, "point"))),
+         pin = as.factor(ifelse(str_detect(name, "j1"), "pH","Temperature"))) %>%
   arrange(time) %>%
-  group_by(Rate) %>%
-  pivot_longer(cols = 3:14,
-               names_to = "name",
-               values_to = "value") %>%
-  separate(name, c("Pin", "name")) %>%
-  filter(!Pin == "J4minus",
-         !name %in% c("min", "max")) %>%
-  mutate(Pin = ifelse(Pin == "J1", "J1", "J4"))
+  filter(time_point>20, time_point<70)
+
+ggplot(plot_long, aes(x=time_point, y=value, group=rate)) +
+  geom_line(data = subset(plot_long, rate == "point"), aes(color=rate), linewidth=1) +
+  geom_line(data = subset(plot_long, rate == "64"), aes(color=rate), linewidth=1) +
+  geom_line(data = subset(plot_long, rate == "256"), aes(color=rate), linewidth=1) +
+  #geom_line(data = subset(comp_long, name == "256 Sample (1x)"), aes(color=name)) +
+  #geom_line(data = subset(comp_long, name == "Oversample (256x)"), aes(y=value+0.4, color=name)) +
+  #scale_color_manual(values = c("#0072B2", "#E69F00", "#D55E00")) +
+  facet_wrap(~pin, scales="free_y") +
+  labs(y="Voltage (mV)", color = "", x="Time (s)") +
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20)) +
+  scale_x_continuous(labels = c("0", "10", "20", "30", "40", "50")) +
+  #scale_color_discrete(labels=c('Oversample (256x)', 'Oversample (64x)', 'Sample (1x)')) +
+  scale_color_manual(labels=c('Oversample (256x)', 'Oversample (64x)', 'Sample (1x)'), values = c("#0072B2", "#D55E00","#56B4E9"))
+
+ggsave(here("figures", "final", "oversample_final.png"), height=15, width=25, units="cm")
+  
 
 #plot means plus SDs
 #ggplot(plot_long, aes(x=Time, y=value, group=Rate)) +
@@ -45,15 +60,14 @@ plot_long <- all_merged %>%
 #  labs(y="Bits")
 
 plot_wide <- plot_long %>%
-  pivot_wider(names_from=name, values_from = value) %>%
-  mutate(Pin = as.factor(Pin))
+  pivot_wider(names_from=name, values_from = value)
 
 #plot lines
-ggplot(plot_wide, aes(x=Time, y=SD, group=Rate)) +
-  geom_point(aes(color=Rate)) +
-  geom_smooth(aes(color=Rate),method='lm', formula= y~x, se=FALSE) +
-  facet_wrap(~Pin, scales="free") +
-  labs(y="Standard deviation (bits)")
+ggplot(plot_long, aes(x=time, y=value, group=rate)) +
+  geom_line(aes(color=rate)) +
+  #geom_smooth(aes(color=rate),method='lm', formula= y~x, se=FALSE) +
+  facet_wrap(~pin, scales="free") +
+  labs(y="Voltage (mV)")
 
 plot_j1 <- plot_wide %>%
   filter(Pin=="J1")
@@ -73,7 +87,7 @@ ggplot(plot_wide, aes(x=Rate, y=SD)) +
   geom_boxplot(aes(color=Rate)) +
   geom_point(aes(color=Rate), alpha=0.2) +
   facet_wrap(~Pin, scales = "free") +
-  labs(y="Standard deviation (bits)") +
+  labs(y="Voltage (mV)") +
   theme(legend.position = "none")
 
 #ggsave(here("figures", "final", "oversample_sd.png"), height=15, width=25, units="cm")
