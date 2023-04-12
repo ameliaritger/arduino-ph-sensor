@@ -10,55 +10,64 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(here)
 library(janitor)
+
+
 ```
 
 Justify oversampling rate
 ```{r}
-pathname <- "./data/oversample/" #name the file pathway (i.e., where in the directy the files are stored)
-file_names <- list.files(path = pathname, 
-                         full.names = F,
-                         pattern='*.CSV') #get a list of the names of the files (only .xlsx)
+file_names <- list.files(here("data", "oversample"), 
+                         pattern = ".CSV$",
+                         full.names = F) #get a list of the names of the files (only .xlsx)
 
-# To upload files individually
-#for (temp_name in file_names){
-#  file.temp <- read_csv(paste0(pathname, temp_name))
-#  assign(gsub(".csv", "", temp_name, fixed = T), file.temp)
-#}
-
-all_merged <- read_csv(here("data", "oversample", file_names), col_names = TRUE) %>%
-  clean_names() %>%
-  select(2,1,7:10,15:18,21:24) %>%
-  setNames(c("Time", "Rate", "J1 Mean", "J1 min", "J1 max", "J1 SD", "J4plus Mean", "J4plus min", "J4plus max", "J4plus SD", "J4minus Mean", "J4minus min", "J4minus max", "J4minus SD")) %>%
-  mutate(Rate = as.factor(Rate))
+all_merged <- read_csv(here("data", "OVERSAMP.CSV"), col_names = TRUE) %>%
+  clean_names()
 
 #Group then plot
 plot_long <- all_merged %>%
-  arrange(Time) %>%
-  group_by(Rate) %>%
-  pivot_longer(cols = 3:14,
-               names_to = "name",
-               values_to = "value") %>%
-  separate(name, c("Pin", "name")) %>%
-  filter(!Pin == "J4minus",
-         !name %in% c("min", "max")) %>%
-  mutate(Pin = ifelse(Pin == "J1", "J1", "J4"))
+  mutate(time_point = seq(1:nrow(all_merged))) %>%
+  pivot_longer(cols=c(3,4, 7, 10,11, 14), names_to="name", values_to="value") %>%
+  select(1:2, 10:13) %>%
+  mutate(rate = as.factor(ifelse(str_detect(name, "64"), 64,
+                       ifelse(str_detect(name, "256"), 256, "point"))),
+         pin = as.factor(ifelse(str_detect(name, "j1"), "pH","Temperature"))) %>%
+  arrange(time) %>%
+  filter(time_point>20, time_point<70)
+
+ggplot(plot_long, aes(x=time_point, y=value, group=rate)) +
+  geom_line(data = subset(plot_long, rate == "point"), aes(color=rate), linewidth=1) +
+  geom_line(data = subset(plot_long, rate == "64"), aes(color=rate), linewidth=1) +
+  geom_line(data = subset(plot_long, rate == "256"), aes(color=rate), linewidth=1) +
+  #geom_line(data = subset(comp_long, name == "256 Sample (1x)"), aes(color=name)) +
+  #geom_line(data = subset(comp_long, name == "Oversample (256x)"), aes(y=value+0.4, color=name)) +
+  #scale_color_manual(values = c("#0072B2", "#E69F00", "#D55E00")) +
+  facet_wrap(~pin, scales="free_y") +
+  labs(y="Voltage (mV)", color = "", x="Time (s)") +
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20)) +
+  scale_x_continuous(labels = c("0", "10", "20", "30", "40", "50")) +
+  #scale_color_discrete(labels=c('Oversample (256x)', 'Oversample (64x)', 'Sample (1x)')) +
+  scale_color_manual(labels=c('Oversample (256x)', 'Oversample (64x)', 'Sample (1x)'), values = c("#0072B2", "#D55E00","#56B4E9"))
+
+ggsave(here("figures", "final", "oversample_final.png"), height=15, width=25, units="cm")
+  
 
 #plot means plus SDs
-ggplot(plot_long, aes(x=Time, y=value, group=Rate)) +
-  geom_point(aes(color=Rate)) +
-  facet_grid2(vars(name), vars(Pin), scales="free_y", independent="y") +
-  labs(y="Bits")
+#ggplot(plot_long, aes(x=Time, y=value, group=Rate)) +
+#  geom_point(aes(color=Rate)) +
+#  facet_grid2(vars(name), vars(Pin), scales="free_y", independent="y") +
+#  labs(y="Bits")
 
 plot_wide <- plot_long %>%
-  pivot_wider(names_from=name, values_from = value) %>%
-  mutate(Pin = as.factor(Pin))
+  pivot_wider(names_from=name, values_from = value)
 
 #plot lines
-ggplot(plot_wide, aes(x=Time, y=SD, group=Rate)) +
-  geom_point(aes(color=Rate)) +
-  geom_smooth(aes(color=Rate),method='lm', formula= y~x, se=FALSE) +
-  facet_wrap(~Pin, scales="free") +
-  labs(y="Standard deviation (bits)")
+ggplot(plot_long, aes(x=time, y=value, group=rate)) +
+  geom_line(aes(color=rate)) +
+  #geom_smooth(aes(color=rate),method='lm', formula= y~x, se=FALSE) +
+  facet_wrap(~pin, scales="free") +
+  labs(y="Voltage (mV)")
 
 plot_j1 <- plot_wide %>%
   filter(Pin=="J1")
@@ -68,7 +77,6 @@ cor(plot_j1$SD, plot_j1$Time)
 plot_j4 <- plot_wide %>%
   filter(Pin=="J4")
 hist(plot_j4$SD)
-
 cor(plot_j4$SD, plot_j4$Time)
 
 sample_lm = lm(data=plot_wide, SD~Time+Rate+Pin)
@@ -79,12 +87,24 @@ ggplot(plot_wide, aes(x=Rate, y=SD)) +
   geom_boxplot(aes(color=Rate)) +
   geom_point(aes(color=Rate), alpha=0.2) +
   facet_wrap(~Pin, scales = "free") +
-  labs(y="Standard deviation (bits)") +
+  labs(y="Voltage (mV)") +
   theme(legend.position = "none")
+
+#ggsave(here("figures", "final", "oversample_sd.png"), height=15, width=25, units="cm")
 
 sample_anova <-aov(data=plot_wide,SD~Rate+Pin)
 summary(sample_anova)
 TukeyHSD(sample_anova, which="Rate")
+```
+
+Get summary stats of S.D.s
+```{r}
+plot_sum <- plot_wide %>%
+  group_by(Pin, Rate) %>%
+  summarize(avgSD = mean(SD))
+
+ggplot(plot_sum, aes(x=Rate, y=avgSD, group=Pin)) +
+  geom_point(aes(color=Pin))
 ```
 
 Justify oversampling at all
@@ -95,6 +115,7 @@ all_comp <- read_csv(here("data", "oversample", file_names), col_names = TRUE) %
   setNames(c("Time", "Rate", "J1 point","J1 oversampled", "J4plus point","J4plus oversampled","J4minus point","J4minus oversampled")) %>%
   mutate(Rate = as.factor(Rate)) %>%
   filter(Rate == "64")
+  #filter(Rate %in% c("64", "256"))
 
 #Group then plot
 comp_long <- all_comp %>%
@@ -107,20 +128,25 @@ comp_long <- all_comp %>%
   filter(if ('J4minus' %in% Pin) between(value,51.6,51.67) else TRUE) %>% #remove the three super anomaly points for J4-, would've filtered them out anyway
   ungroup() %>%
   filter(!Pin=="J4minus") %>% #remove J4- pin
-  mutate(name = ifelse(name == "point", "Sample (1x)", "Oversampled (64x)"),
-         Pin = ifelse(Pin == "J1", "J1", ifelse(Pin == "J4plus", "J4+", "J4-")))
+  mutate(name = ifelse(name == "point" & Rate == "64", "Sample (1x)", 
+                       ifelse(name == "point" & Rate == "256", "256 Sample (1x)",
+                       ifelse(Rate == "64", "Oversample (64x)", "Oversample (256x)"))),
+         Pin = ifelse(Pin == "J1", "pH", ifelse(Pin == "J4plus", "Temperature", "J4-"))) %>%
+  group_by(Rate)
 
 #plot means plus SDs
 ggplot(comp_long, aes(x=Time, y=value, group=name)) +
   geom_line(data = subset(comp_long, name == "Sample (1x)"), aes(color=name)) +
-  geom_line(data = subset(comp_long, name == "Oversampled (64x)"), aes(color=name)) +
-  scale_color_manual(values = c("#0072B2", "#E69F00")) +
+  geom_line(data = subset(comp_long, name == "Oversample (64x)"), aes(color=name)) +
+  #geom_line(data = subset(comp_long, name == "256 Sample (1x)"), aes(color=name)) +
+  #geom_line(data = subset(comp_long, name == "Oversample (256x)"), aes(y=value+0.4, color=name)) +
+  scale_color_manual(values = c("#0072B2", "#E69F00", "#D55E00")) +
   facet_wrap(~Pin, scales="free_y") +
   labs(y="Voltage (mV)", color = "") +
   theme_bw() +
   theme(legend.position = "top",
         text = element_text(size = 20))
 
-#ggsave(here("figures", "final", "oversample_nominus.png"), height=15, width=25, units="cm")
+ggsave(here("figures", "final", "oversample_nominus.png"), height=15, width=25, units="cm")
 ```
 
