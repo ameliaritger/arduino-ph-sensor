@@ -1,0 +1,98 @@
+---
+title: "STEP 4: Plot ALL calibrated data against HOBO temperature data"
+author: "Amelia Ritger"
+date: "2023-04-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Load libraries, set constants
+```{r}
+library(tidyverse)
+library(readr)
+library(janitor)
+library(here)
+library(lubridate)
+library(scales)
+library(ggpmisc)
+
+file_names <- list.files(here("data", "raw", "deploy"), pattern = "CLEAN", recursive = FALSE, full.names = TRUE)
+
+merged <- read_csv(file_names, col_names = TRUE) %>%
+  mutate(date_lubridate=mdy(date)) %>% # tell R "date" is a DATE
+  mutate(time_lubridate=hms(time)) %>% # tell R "time" is a TIME
+  unite(date_time, c(date, time), sep = " ", remove = TRUE) %>% # combine the date and time columns
+  mutate(date_time_lubridate=mdy_hms(date_time),
+         date_time = round_date(date_time_lubridate, "5 mins")) %>%
+  filter(date_time > ymd_hms("2022-12-15 17:00:00")) %>%
+  mutate(v1corr = ifelse(logger=="arduino", v1-11.2, v1),
+         v4corr = ifelse(logger=="arduino", v4-1.3,v4))
+
+merged_corr_sum <- merged %>%
+  group_by(logger) %>%
+  summarize(meanT = mean(v4corr),
+            rangeT = max(v4) - min(v4),
+            meanP = mean(v1corr),
+            rangeP = max(v1) - min(v1),
+            sdT = sd(v4),
+            sdP = sd(v1))
+
+merged_diff <- merged %>%
+  arrange(date_time) %>%
+  mutate(diff_lag = abs(v4-lag(v4, default = first(v4))),
+         diff_time = date_time-lag(date_time, default = first(date_time)),
+         diff_temp = v4-lag(v4, default=first(v4)),
+         diff_ph = v1-lag(v1, default=first(v1))) %>%
+  filter(!diff_ph == 0) %>%
+  group_by(logger) %>%
+  summarize(meanT = mean(diff_temp),
+            meanP = mean(diff_ph),
+            sdT = sd(v4),
+            sdP = sd(v1))
+
+avgT <- (merged_corr_sum[[1,2]] + merged_corr_sum[[2,2]]) / 2
+avgP <- (merged_corr_sum[[1,4]] + merged_corr_sum[[2,4]]) / 2
+
+diffT <- merged_corr_sum[[1,2]] - merged_corr_sum[[2,2]]
+diffP <- merged_corr_sum[[1,4]] - merged_corr_sum[[2,4]]
+
+sd1a <- merged_diff$sdT[1]
+sd1m <- merged_diff$sdT[2]
+
+ggplot(merged, aes(x=date_time)) +
+  geom_line(aes(y=v4corr, color=logger),size=1) +
+  #geom_ribbon(aes(ymin = v4 - ifelse(logger=="arduino", sd1a, sd1m), ymax = v4 + ifelse(logger=="arduino", sd1a, sd1m), fill=logger), alpha=0.2, show.legend=FALSE) +
+  scale_color_brewer(palette="Set1", direction=-1, labels = c("New Design", "Old Design")) +
+  scale_fill_brewer(palette="Set1", direction=-1, labels = c("New Design", "Old Design")) +
+  labs(x="Date and Time", y="Temperature (mV)", color = "") +
+  scale_x_datetime(breaks = scales::date_breaks("4 hours"), 
+                   labels = date_format("%d %b %Y %H:%M")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top")
+
+#ggsave(here("figures", "final", "temp-deploy.png"), height=10, width=15, units="cm")
+```
+
+
+```{r}
+#Subset it for the swap time
+merged_diff <- merged %>%
+  arrange(date_time) %>%
+  mutate(diff_lag = abs(v4-lag(v4, default = first(v4))),
+         diff_time = date_time-lag(date_time, default = first(date_time)),
+         diff_temp = v4-lag(v4, default=first(v4)),
+         diff_ph = v1-lag(v1, default=first(v1))) %>%
+  filter(!diff_ph == 0) #%>%
+  #group_by(logger) %>%
+  summarize(meanT = mean(diff_temp),
+            meanP = mean(diff_ph),
+            sdT = sd(v4),
+            sdP = sd(v1))
+
+ggplot(merged_diff, aes(x=date_time)) +
+  geom_point(aes(y=diff_ph, color=logger))
+```

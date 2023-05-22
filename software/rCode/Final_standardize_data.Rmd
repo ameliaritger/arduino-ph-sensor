@@ -1,0 +1,110 @@
+---
+title: "STEP 1: Mass process standardize RAW Arduino and Madgetech data"
+author: "Amelia Ritger"
+date: "2023-04-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readr)
+library(janitor)
+library(here)
+library(lubridate)
+```
+
+Import and standardize all of the Arduino data
+```{r}
+pathname <- "../data/raw/april-all/" #name the file pathway
+
+file_names <- list.files(path = pathname, 
+                         full.names = F,
+                         pattern=".*ard")
+
+for (temp_name in file_names){
+  file.temp <- read_csv(paste0(pathname, temp_name))
+  assign(gsub(".csv", "", temp_name, fixed = T), file.temp)
+  
+  file.temp <- file.temp %>%
+  clean_names() %>% # read in tris data excel file
+  mutate(date_lubridate=mdy(date)) %>% # tell R "date" is a DATE
+  mutate(time_lubridate=hms(time)) %>% # tell R "time" is a TIME
+  unite(date_time, c(date, time), sep = " ", remove = TRUE) %>% # combine the date and time columns
+  mutate(date_time_lubridate=mdy_hms(date_time)) %>%# tell R "date_time" is a DATE and a TIME
+  mutate(j4 = j4_oversampled_mean_m_v - j4_oversampled_mean_m_v_2) %>%
+  select(24, 3,8,9,25) %>%
+  setNames(c("date_time", "v1", "v3", "v2", "v4")) %>%
+    select(1,2,4,3,5) %>%
+  mutate(v2 = abs(v2),
+         logger = "arduino")
+  
+write.csv(file.temp, here("data", "CLEAN", paste("CLEAN_", temp_name, sep="")),row.names = FALSE) # create csv with calibrated values
+}
+```
+
+Import and standardize all of the Madgetech data
+```{r}
+pathname <- "../data/raw/april-all/" #name the file pathway
+
+file_names <- list.files(path = pathname, 
+                         full.names = F,
+                         pattern="mad") #get a list of the names of the files
+
+for (temp_name in file_names){
+  file.temp <- read_csv(paste0(pathname, temp_name))
+  assign(gsub(".csv", "", temp_name, fixed = T), file.temp)
+  
+  file.temp <- file.temp %>%
+  filter(row_number()!=c(1:5)) %>% # remove the first 5 rows
+  row_to_names(row_number=1) %>% # make the top row the column headers
+  rename("Date"=1,
+         "Time"=2) %>% # rename date and time columns
+  clean_names() %>% # read in tris data excel file
+  mutate(date_lubridate=mdy(date)) %>% # tell R "date" is a DATE
+  mutate(time_lubridate=hms(time)) %>% # tell R "time" is a TIME
+  unite(date_time, c(date, time), sep = " ", remove = TRUE) %>% # combine the date and time columns
+  mutate(date_time_lubridate=mdy_hms(date_time)) %>% # tell R "date_time" is a DATE and a TIME
+  select(8, 2:5) %>%
+  setNames(c("date_time", "v1", "v2", "v3", "v4")) %>%
+    mutate(logger = "madgetech")
+
+  write.csv(file.temp, here("data", "CLEAN", paste("CLEAN_", temp_name, sep="")),row.names = FALSE) # create csv with calibrated values
+}
+```
+
+Add on Durafet ID to "green" and "red" durafets 
+```{r}
+pathname <- "../data/CLEAN/" #name the file pathway (i.e., where in the directly the files are stored)
+
+file_names <- list.files(path = pathname, 
+                         full.names = F,
+                         pattern="green") #get a list of the names of the files (only .xlsx)
+#Kris's for loop that takes the names of the files stores in file_names, and pastes them iteratively over each file as it reads it in (via read_xlsx). Note: file.temp is a temporary object that "floats" for each iterative process 
+
+for (temp_name in file_names){
+  file.temp <- read_csv(paste0(pathname, temp_name))
+  assign(gsub(".csv", "", temp_name, fixed = T), file.temp)
+  
+  file.temp <- file.temp %>%
+    mutate(durafet = "green")
+  
+  write.csv(file.temp, here("data", "CLEAN", temp_name),row.names = FALSE) # create csv with calibrated values
+}
+
+file_names <- list.files(path = pathname, 
+                         full.names = F,
+                         pattern="red") #get a list of the names of the files (only .xlsx)
+#Kris's for loop that takes the names of the files stores in file_names, and pastes them iteratively over each file as it reads it in (via read_xlsx). Note: file.temp is a temporary object that "floats" for each iterative process 
+
+for (temp_name in file_names){
+  file.temp <- read_csv(paste0(pathname, temp_name))
+  assign(gsub(".csv", "", temp_name, fixed = T), file.temp)
+  
+  file.temp <- file.temp %>%
+    mutate(durafet = "red")
+  
+  write.csv(file.temp, here("data", "CLEAN", temp_name),row.names = FALSE) # create csv with calibrated values
+}
+```
+
