@@ -1,0 +1,161 @@
+---
+title: "Compare madgetech and arduino reads during sensor swap"
+author: "Amelia Ritger"
+date: "2023-03-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load libraries
+```{r}
+library(tidyverse)
+library(here)
+library(lubridate)
+library(scales)
+
+#start_time <-  "12-16-2022 14:30:00" #to remove 12-15-2022 11:00:00, 12-14-2022 18:00:00, 12-16-2022 14:30:00
+#end_time <- "12-16-2022 15:30:00" #to remove 12-15-2022 11:40:00, 12-14-2022 18:30:00, 12-16-2022 15:30:00
+```
+
+Load sensor data
+```{r}
+pattern_keep = "1216" #set the date of interest
+pattern_remove_calib = "_calib" #exclude calibration files
+
+files_all <- list.files(here("data", "calibrated"), pattern = pattern_keep, recursive = FALSE, full.names = TRUE)
+files_calib <- list.files(here("data", "calibrated"), pattern = pattern_remove_calib, recursive = FALSE, full.names = TRUE)
+file_names <- setdiff(files_all, files_calib)
+
+merged <- read_csv(file_names, col_names = TRUE) %>%
+  arrange(date_time) %>%
+  group_by(logger, tolerance) %>%
+  mutate(diff_lag = abs(durafet_temp-lag(durafet_temp, default = first(durafet_temp)))) %>%
+  filter(diff_lag < 0.3) %>% #remove weird outliers FIX THIS NUMBER
+  ungroup()
+
+merged_ribbon <- merged %>%
+  mutate(tolerance = ifelse(tolerance %in% c("+5", "+1"), "plus", ifelse(tolerance %in% c("-5", "-1"), "minus", "ideal"))) %>%
+  #mutate(Logger=ifelse(logger=="arduino", "New design", "Old design")) %>%
+  select(1,2,8,12:13) %>%
+  group_by(logger) %>%
+  filter(!logger=="real-arduino") %>%
+  pivot_wider(names_from = tolerance, values_from = c(durafet_temp, omegasph)) %>%
+  filter(!date_time==ymd_hms("2022-12-16 16:52:55"),
+         !date_time==ymd_hms("2022-12-16 15:31:18")) %>% #remove weird arduino points
+  mutate(Logger = ifelse(logger=="arduino", "New design", "Old design"))
+
+ggplot(data=merged_ribbon, aes(x=date_time, group=Logger)) +
+  geom_point(aes(y=omegasph_ideal, color=Logger), size=1) +
+  labs(x="Date and Time", y="pH") +
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%Y-%m-%d %H:%M")) +
+                   #limits = as.POSIXct(c("2022-12-15 23:00:00","2022-12-16 14:00:00")),
+                   #expand = c(0, 0)) +
+  scale_color_brewer(palette="Set1", direction=-1) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top")
+  
+ggsave(here("figures", "final", "NEW-swap-ph.png"), height=10, width=15, units="cm")
+
+ggplot(data=merged_ribbon, aes(x=date_time, group=Logger)) +
+  geom_point(aes(y=durafet_temp_ideal, color=Logger)) +
+  labs(x="Date and Time", y="Temp (C)") +
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%Y-%m-%d %H:%M")) +
+                   #limits = as.POSIXct(c("2022-12-15 23:00:00","2022-12-16 14:00:00")),
+                   #expand = c(0, 0)) +
+  scale_color_brewer(palette="Set1", direction=-1) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top")
+  
+ggsave(here("figures", "final", "NEW-swap-temp.png"), height=10, width=15, units="cm")
+```
+
+Calculate difference between swapped sensors 
+```{r}
+merged_diff <- merged %>%
+  mutate(tolerance = ifelse(tolerance %in% c("+5", "+1"), "plus", ifelse(tolerance %in% c("-5", "-1"), "minus", "ideal"))) %>%
+  #mutate(Logger=ifelse(logger=="arduino", "New design", "Old design")) %>%
+  select(1,2,8,12:13) %>%
+  filter(!logger=="real-arduino",
+         tolerance=="ideal",
+         date_time<ymd_hms("2022-12-16 16:55:15"),
+         date_time<ymd_hms("2022-12-16 15:40:08") | date_time>ymd_hms("2022-12-16 16:14:46") ) %>%
+  mutate(period = ifelse(date_time>=ymd_hms("2022-12-16 16:00:00"), "2", "1")) %>%
+  arrange(date_time) %>%
+  group_by(period) %>%
+  mutate(diff_time = date_time-lag(date_time, default = first(date_time)),
+         diff_temp = ifelse(date_time<ymd_hms("2022-12-16 15:01:39"), durafet_temp-lag(durafet_temp, default=first(durafet_temp)), durafet_temp-lead(durafet_temp, default=first(durafet_temp))),
+         diff_ph = ifelse(date_time<ymd_hms("2022-12-16 15:01:39"), omegasph-lag(omegasph, default=first(omegasph)), omegasph-lead(omegasph, default=first(omegasph)))) %>%
+  ungroup() %>%
+  filter(!date_time==ymd_hms("2022-12-16 15:40:00"),
+         !date_time==ymd_hms("2022-12-16 16:55:10"), #remove very last observation
+         !date_time==ymd_hms("2022-12-16 14:20:00")) %>% #remove very first observation
+  mutate(same = ifelse(logger == lag(logger), "YES", "NO")) %>%
+  arrange(date_time) %>%
+  group_by(logger, tolerance) %>%
+  mutate(diff_lag = abs(diff_temp-lag(diff_temp, default = first(diff_temp)))) %>%
+  filter(diff_lag < 0.1) %>%
+  ungroup()
+
+merged_diff_sum <- merged_diff %>%
+  group_by(period, logger) %>%
+  #mutate(diff_temp = abs(diff_temp),
+  #       diff_ph = abs(diff_ph)) %>%
+  summarize(mean_temp = mean(durafet_temp),
+            mean_diff_t = mean(diff_temp),
+            mean_diff_p = mean(diff_ph))
+
+avg_t_1 <- abs(mean(merged_diff_sum[[1,4]], merged_diff_sum[[2,4]]))
+avg_t_2 <- abs(mean(merged_diff_sum[[3,4]], merged_diff_sum[[4,4]]))
+avg_temp <- avg_t_2-avg_t_1
+
+avg_p_1 <- abs(mean(merged_diff_sum[[1,5]], merged_diff_sum[[2,5]]))
+avg_p_2 <- abs(mean(merged_diff_sum[[3,5]], merged_diff_sum[[4,5]]))
+avg_ph <- avg_p_2-avg_p_1
+```
+
+Plot differences between swapped sensors
+```{r}
+ggplot(data=merged_diff, aes(x=date_time, group=logger)) +
+  geom_point(aes(y=diff_temp, color=logger), size=1) +
+  labs(x="Date and Time", y="Temperature Difference (C)", color = "") +
+  annotate("text", y=0, x=ymd_hms("2022-12-16 15:00:00"), label="Mean = 0.1482") +
+    geom_segment(aes(x=ymd_hms("2022-12-16 15:00:00"), xend=ymd_hms("2022-12-16 15:00:00"), y = 0.05, yend = 0.12), arrow = arrow(length = unit(0.5, "cm"))) +
+      geom_segment(aes(x=ymd_hms("2022-12-16 15:00:00"), xend=ymd_hms("2022-12-16 15:00:00"), y = -0.05, yend = -0.12), arrow = arrow(length = unit(0.5, "cm"))) +
+    annotate("text", y=0, x=ymd_hms("2022-12-16 16:35:00"), label="Mean = 0.1920") +
+  geom_segment(aes(x=ymd_hms("2022-12-16 16:35:00"), xend=ymd_hms("2022-12-16 16:35:00"), y = 0.05, yend = 0.12), arrow = arrow(length = unit(0.5, "cm"))) +
+      geom_segment(aes(x=ymd_hms("2022-12-16 16:35:00"), xend=ymd_hms("2022-12-16 16:35:00"), y = -0.05, yend = -0.12), arrow = arrow(length = unit(0.5, "cm"))) +
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%Y-%m-%d %H:%M")) +
+  scale_color_brewer(palette="Set1", direction=-1, labels = c("New Design-Old Design", "Old Design-New Design")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top")
+
+ggsave(here("figures", "final", "swap-temp_diff.png"), height=10, width=15, units="cm")
+
+ggplot(data=merged_diff, aes(x=date_time, group=logger)) +
+  geom_point(aes(y=diff_ph, color=logger), size=1) +
+  labs(x="Date and Time", y="pH Difference", color="") +
+  annotate("text", y=0, x=ymd_hms("2022-12-16 15:00:00"), label="Mean = 0.2479") +
+  geom_segment(aes(x=ymd_hms("2022-12-16 15:00:00"), xend=ymd_hms("2022-12-16 15:00:00"), y = 0.05, yend = 0.2), arrow = arrow(length = unit(0.5, "cm"))) +
+  geom_segment(aes(x=ymd_hms("2022-12-16 15:00:00"), xend=ymd_hms("2022-12-16 15:00:00"), y = -0.05, yend = -0.2), arrow = arrow(length = unit(0.5, "cm"))) +
+    annotate("text", y=0, x=ymd_hms("2022-12-16 16:35:00"), label="Mean = 0.2847") +
+  geom_segment(aes(x=ymd_hms("2022-12-16 16:35:00"), xend=ymd_hms("2022-12-16 16:35:00"), y = 0.05, yend = 0.2), arrow = arrow(length = unit(0.5, "cm"))) +
+  geom_segment(aes(x=ymd_hms("2022-12-16 16:35:00"), xend=ymd_hms("2022-12-16 16:35:00"), y = -0.05, yend = -0.2), arrow = arrow(length = unit(0.5, "cm"))) +
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%Y-%m-%d %H:%M")) +
+  scale_y_continuous(limits = c(-0.4, 0.4)) +
+  scale_color_brewer(palette="Set1", direction=-1, labels = c("New Design-Old Design", "Old Design-New Design")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top")
+
+ggsave(here("figures", "final", "swap-ph_diff.png"), height=10, width=15, units="cm")
+```

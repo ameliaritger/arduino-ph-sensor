@@ -1,0 +1,36 @@
+---
+title: "temperature correction plot"
+author: "Amelia Ritger"
+date: "2022-12-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Save the data as a .csv
+```{r}
+merge_temp_diff <- full_join(log_comp_tris_15, log_comp_tris_16)
+merge_temp_diff <- full_join(merge_temp_diff, log_comp_tris_14)
+merge_temp_diff <- full_join(merge_temp_diff, log_comp_deploy)
+#merge_temp_diff <- full_join(merge_temp_diff, hobo_comp_tris_swap)
+
+write_csv(merge_temp_diff, here("data", "temp", "logger_correction-madgetech.csv"))
+```
+
+Plot the data
+```{r}
+library(ggpmisc)
+
+data <- read_csv(here("data", "temp", "logger_correction-madgetech.csv"))
+
+ggplot(data, aes(x=mean_temp, y=mean_diff)) +
+  geom_point() +
+  stat_poly_line() +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label)))) +
+  labs(x="Temperature", y="Avg temp difference between madgetech and arduino")
+
+ggsave("temp_correction_logg_mad.png")
+```
+

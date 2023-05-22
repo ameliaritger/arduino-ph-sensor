@@ -1,0 +1,742 @@
+---
+title: "Untitled"
+author: "Amelia Ritger"
+date: "2023-04-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readr)
+library(janitor)
+library(here)
+library(lubridate)
+library(scales)
+library(ggpmisc)
+
+file_names <- list.files(here("data", "calibrated"), pattern = "OMEGAS_CLEAN", recursive = FALSE, full.names = TRUE)
+
+merged <- read_csv(file_names, col_names = TRUE) %>%
+  mutate(date_time = round_date(date_time, "5 seconds")) %>%
+  rename("durafet_temp"="omegas_temp_raw.durafet")
+
+temp1 <- read_csv(here("data", "temp", "Apr8_lab.csv"), col_names = TRUE)
+temp2 <- read_csv(here("data", "temp", "Apr9_lab.csv"), col_names = TRUE) 
+temp4 <- read_csv(here("data", "temp", "Apr12_lab_newhobo.csv"), col_names = TRUE) 
+temp5 <- read_csv(here("data", "temp", "Apr11_lab_newhobo.csv"), col_names = TRUE) 
+temp6 <- read_csv(here("data", "temp", "Apr10_lab_newhobo_overnight.csv"), col_names = TRUE) 
+
+temp3 <- rbind(temp1, temp2, temp4, temp5, temp6) 
+
+temp <- temp3 %>%
+  select(2:3) %>%
+  setNames(c("date_time", "hobo_temp")) %>%
+  mutate(date_time=mdy_hms(date_time)) %>%
+  mutate(date_time = round_date(date_time, "5 seconds"))
+
+merged_all <- full_join(merged, temp) %>%
+  filter(!is.na(durafet_temp)) %>%
+  mutate(diff_temp = hobo_temp - durafet_temp)
+```
+
+4/11 SWAP
+```{r}
+merged_swap <- merged_all %>%
+  filter(date_time > ymd_hms("2023-04-11 12:00:00"), date_time < ymd_hms("2023-04-11 14:55:00")) %>%
+  mutate(logger = ifelse(date_time < ymd_hms("2023-04-11 15:00:00"), "madgetech_comp", logger),
+         logger = ifelse(date_time < ymd_hms("2023-04-11 13:45:00") & durafet == "green", "Madgetech-2",
+                         ifelse(date_time < ymd_hms("2023-04-11 13:45:00") & durafet == "red", "Madgetech-1",
+                         ifelse(date_time > ymd_hms("2023-04-11 13:45:00") & durafet == "red", "Madgetech-2",
+                                ifelse(date_time > ymd_hms("2023-04-11 13:45:00") & durafet == "green","Madgetech-1", "Madgetech-huh")))))
+
+ggplot(merged_swap, aes(x=date_time)) +
+  geom_line(aes(y=durafet_temp, color=logger, linetype=durafet)) +
+  #geom_point(aes(y=hobo_temp)) +
+  labs(x="Date and Time", y="pH", color = "") +
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%Y-%m-%d %H:%M")) +
+  #scale_color_brewer(palette="Set1", direction=-1, labels = c("Madgetech #1", "Madgetech #2")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top")
+
+merge_swap_diff <- merged_swap %>%
+  arrange(date_time) %>%
+  group_by(logger) %>%
+  mutate(diff_lag = abs(durafet_temp-lag(durafet_temp, default = first(durafet_temp)))) %>%
+  filter(!diff_lag > 0.2,
+         !diff_lag == 0) %>%
+  ungroup()
+
+merged_diff <- merge_swap_diff %>%
+  mutate(period = ifelse(date_time<=ymd_hms("2023-04-11 13:45:00"), "1", "2")) %>%
+  arrange(date_time) %>%
+  group_by(period) %>%
+  mutate(diff_time = date_time-lag(date_time, default = first(date_time)),
+         diff_temp = durafet_temp-lag(durafet_temp, default=first(durafet_temp)),
+         diff_ph = p_h-lag(p_h, default=first(p_h))) %>%
+  filter(!diff_ph == 0) %>%
+         #diff_temp = ifelse(diff_time>0, NA, durafet_temp-lag(durafet_temp, default=first(durafet_temp))),
+         #diff_ph = ifelse(diff_time>0, NA, p_h-lag(p_h, default=first(p_h)))) %>%
+  #filter(diff_ph < -0.1 | diff_ph > 0.1) %>%
+  ungroup() %>%
+  mutate(Durafet = ifelse(durafet=="green", "A", "B"))
+
+merged_diff_sum <- merged_diff %>%
+  group_by(period, logger, durafet) %>%
+  summarize(mean_temp = mean(durafet_temp),
+            sd_temp = sd(durafet_temp),
+            mean_ph = mean(p_h),
+            sd_ph = sd(p_h),
+            mean_diff_t = mean(diff_temp),
+            sd_diff_t = sd(diff_temp),
+            mean_diff_p = mean(diff_ph),
+            sd_diff_p = sd(diff_ph))
+
+period1 <- merged_diff %>%
+  filter(period==1)
+period2 <- merged_diff %>%
+  filter(period==2)
+
+ggplot(data=merged_diff, aes(x=date_time)) +
+  geom_line(data=period1, aes(y=diff_temp, color=logger, linetype=Durafet), size=1) +
+  geom_line(data=period2, aes(y=diff_temp, color=logger, linetype=Durafet), size=1) +
+  annotate("text", y=0.25, x=ymd_hms("2023-04-11 13:15:00"), label="Mean difference = 0.41") +
+  annotate("text", y=-0.25, x=ymd_hms("2023-04-11 13:15:00"), label="Mean difference = -0.41") +
+  annotate("text", y=0.15, x=ymd_hms("2023-04-11 14:15:00"), label="Mean difference = 0.31") +
+  annotate("text", y=-0.15, x=ymd_hms("2023-04-11 14:15:00"), label="Mean difference = -0.31") +
+  labs(x="Date and Time", y="Temperature difference (C)", color = "") +
+  
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%d %b %Y %H:%M")) +
+  scale_color_manual(values=c("#E69F00", "#009E73"),labels = c("Old Design #1-Old Design #2", "Old Design #2-Old Design #1")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top",
+        plot.margin = margin(0,1.4,0.1,0.6, "cm"))
+
+#ggsave(here("figures", "final", "temp-differenceMAD-diffcalib.png"), height=10, width=15, units="cm")
+
+ggplot(data=merged_diff, aes(x=date_time)) +
+  geom_line(data=period1, aes(y=diff_ph, color=logger, linetype=Durafet), size=1) +
+  geom_line(data=period2, aes(y=diff_ph, color=logger, linetype=Durafet), size=1) +
+  annotate("text", y=0.02, x=ymd_hms("2023-04-11 13:15:00"), label="Mean difference = 0.006") +
+  annotate("text", y=-0.02, x=ymd_hms("2023-04-11 13:15:00"), label="Mean difference = -0.006") +
+  annotate("text", y=0.01, x=ymd_hms("2023-04-11 14:15:00"), label="Mean difference = 0.019") +
+  annotate("text", y=-0.01, x=ymd_hms("2023-04-11 14:15:00"), label="Mean difference = -0.019") +
+  labs(x="Date and Time", y="pH difference", color = "") +
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%d %b %Y %H:%M")) +
+  scale_color_manual(values=c("#E69F00", "#009E73"),labels = c("Old Design #1-Old Design #2", "Old Design #2-Old Design #1")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top",
+        plot.margin = margin(0,1.4,0.1,0.6, "cm"))
+
+#ggsave(here("figures", "final", "ph-differenceMAD-diffcalib.png"), height=10, width=15, units="cm")
+
+avg_t_1 <- (abs(merged_diff_sum[[1,8]]) + abs(merged_diff_sum[[2,8]])) / 2
+avg_t_2 <- (abs(merged_diff_sum[[3,8]]) + abs(merged_diff_sum[[4,8]])) / 2
+avg_temp <- abs(avg_t_1-avg_t_2)
+
+avg_p_1 <- (abs(merged_diff_sum[[1,10]]) + abs(merged_diff_sum[[2,10]])) / 2
+avg_p_2 <- (abs(merged_diff_sum[[3,10]]) + abs(merged_diff_sum[[4,10]])) / 2
+avg_ph <- abs(avg_p_2-avg_p_1)
+
+#avg_t_1 <- abs((abs(merged_diff_sum[[1,3]]) - abs(merged_diff_sum[[2,3]])))
+#avg_t_2 <- abs((abs(merged_diff_sum[[3,3]]) - abs(merged_diff_sum[[4,3]])))
+#avg_temp <- (avg_t_1+avg_t_2)/2
+
+#avg_p_1 <- abs((abs(merged_diff_sum[[1,5]]) - abs(merged_diff_sum[[2,5]])))
+#avg_p_2 <- abs((abs(merged_diff_sum[[1,5]]) - abs(merged_diff_sum[[2,5]])))
+#avg_ph <- mean(avg_p_2,avg_p_1)
+
+#write.csv(merged_diff_sum, here("data", "mad-mad.csv"),row.names = FALSE) # create csv with calibrated values
+
+```
+
+4/9 SWAP
+```{r}
+merged_swap <- merged_all %>%
+  filter(date_time < ymd_hms("2023-04-09 18:00:00"), date_time > ymd_hms("2023-04-09 15:00:00")) %>%
+  mutate(date_time = round_date(date_time, "15 seconds"))
+#for ARD vs MAD 4/9
+   
+ggplot(merged_swap, aes(x=date_time)) +
+  geom_point(aes(y=p_h, color=logger)) +
+  #geom_point(aes(y=hobo_temp)) +
+  labs(x="Date and Time", y="pH", color = "") +
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%Y-%m-%d %H:%M")) +
+  scale_color_brewer(palette="Set1", direction=-1, labels = c("New Design", "Old Design", "Madgetech #1", "Madgetech #2")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top")
+
+merge_swap_diff <- merged_swap %>%
+  arrange(date_time) %>%
+  group_by(logger) %>%
+  mutate(diff_lag = abs(durafet_temp-lag(durafet_temp, default = first(durafet_temp)))) %>%
+  filter(!diff_lag > 0.2) %>%
+         #!diff_lag > 0.05) %>% #remove lag values associated with start time
+  ungroup()
+
+ggplot(merge_swap_diff, aes(x=date_time)) +
+  geom_point(aes(y=diff_lag, color=logger))
+
+merged_diff <- merge_swap_diff %>%
+  mutate(period = ifelse(date_time <= ymd_hms("2023-04-09 16:00:00"), "1", "2")) %>% #for ARD vs MAD 4/9 comparison
+  arrange(date_time) %>%
+  group_by(period) %>%
+  mutate(diff_time = date_time-lag(date_time, default = first(date_time)),
+         diff_temp = durafet_temp-lag(durafet_temp, default=first(durafet_temp)),
+         diff_ph = p_h-lag(p_h, default=first(p_h))) %>%
+  #filter(!diff_ph == 0,
+  #       !diff_temp==0) %>%
+         #diff_temp = ifelse(diff_time>0, NA, durafet_temp-lag(durafet_temp, default=first(durafet_temp))),
+         #diff_ph = ifelse(diff_time>0, NA, p_h-lag(p_h, default=first(p_h)))) %>%
+  #filter(diff_ph < -0.01 | diff_ph > 0.01) %>%
+  ungroup() %>%
+  mutate(Durafet = ifelse(durafet=="green", "A", "B")) %>%
+#%>%
+  slice(2:n()) %>%
+  filter(!date_time == ymd_hms("2023-04-09 16:05:45"))
+  ## DO BELOW ONLY FOR GRAPHS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  #mutate(logger = ifelse(logger == "Madgetech-2", "madgetech", logger))
+
+merged_diff_sum <- merged_diff %>%
+  group_by(period, logger, durafet) %>%
+  summarize(mean_temp = mean(durafet_temp),
+            sd_temp = sd(durafet_temp),
+            mean_ph = mean(p_h),
+            sd_ph = sd(p_h),
+            mean_diff_t = mean(diff_temp),
+            #sd_diff_t = sd(diff_temp),
+            mean_diff_p = mean(diff_ph))
+            #sd_diff_p = sd(diff_ph))
+
+period1 <- merged_diff %>%
+  filter(period==1)
+period2 <- merged_diff %>%
+  filter(period==2)
+
+ggplot(data=merged_diff, aes(x=date_time)) +
+  geom_line(data=period1, aes(y=diff_temp, color=logger, linetype=Durafet), size=1) +
+  geom_line(data=period2, aes(y=diff_temp, color=logger, linetype=Durafet), size=1) +
+  
+  annotate("text", y=0.4, x=ymd_hms("2023-04-09 15:30:00"), label="Mean difference = 0.67") +
+  annotate("text", y=-0.4, x=ymd_hms("2023-04-09 15:30:00"), label="Mean difference = -0.67") +
+  annotate("text", y=0.4, x=ymd_hms("2023-04-09 16:40:00"), label="Mean difference = 0.87") +
+  annotate("text", y=-0.4, x=ymd_hms("2023-04-09 16:40:00"), label="Mean difference = -0.86") +
+  labs(x="Date and Time", y="Temperature difference (C)", color = "") +
+  
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%d %b %Y %H:%M")) +
+  scale_color_brewer(palette="Set1", direction=-1, labels = c("New Design", "Old Design")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top",
+        plot.margin = margin(0,0.1,0.1,0.6, "cm"))
+
+#ggsave(here("figures", "final", "UPDATEDtemp-differenceARD-newcalib.png"), height=10, width=15, units="cm")
+
+ggplot(data=merged_diff, aes(x=date_time)) +
+  geom_line(data=period1, aes(y=diff_ph, color=logger, linetype=Durafet), size=1) +
+  geom_line(data=period2, aes(y=diff_ph, color=logger, linetype=Durafet), size=1) + 
+  
+  annotate("text", y=0.05, x=ymd_hms("2023-04-09 15:30:00"), label="Mean difference = 0.104") +
+  annotate("text", y=-0.05, x=ymd_hms("2023-04-09 15:30:00"), label="Mean difference = -0.104") +
+  annotate("text", y=0.06, x=ymd_hms("2023-04-09 16:40:00"), label="Mean difference = 0.073") +
+  annotate("text", y=-0.06, x=ymd_hms("2023-04-09 16:40:00"), label="Mean difference = -0.073") +
+  labs(x="Date and Time", y="pH difference", color = "") +
+  
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%d %b %Y %H:%M")) +
+  scale_color_brewer(palette="Set1", direction=-1, labels = c("New Design", "Old Design")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top",
+        plot.margin = margin(0,0.1,0.1,0.6, "cm"))
+
+#ggsave(here("figures", "final", "UPDATEDph-differenceARD-newcalib.png"), height=10, width=15, units="cm")
+
+avg_t_1 <- (abs(merged_diff_sum[[1,8]]) + abs(merged_diff_sum[[2,8]])) / 2
+avg_t_2 <- (abs(merged_diff_sum[[3,8]]) + abs(merged_diff_sum[[4,8]])) / 2
+avg_temp <- avg_t_1-avg_t_2
+
+avg_p_1 <- (abs(merged_diff_sum[[1,9]]) + abs(merged_diff_sum[[2,9]])) / 2
+avg_p_2 <- (abs(merged_diff_sum[[3,9]]) + abs(merged_diff_sum[[4,9]])) / 2
+avg_ph <- avg_p_2-avg_p_1
+
+
+#avg_t_1 <- abs((abs(merged_diff_sum[[1,3]]) - abs(merged_diff_sum[[2,3]])))
+#avg_t_2 <- abs((abs(merged_diff_sum[[3,3]]) - abs(merged_diff_sum[[4,3]])))
+#avg_temp <- (avg_t_1+avg_t_2)/2
+
+#avg_p_1 <- abs((abs(merged_diff_sum[[1,5]]) - abs(merged_diff_sum[[2,5]])))
+#avg_p_2 <- abs((abs(merged_diff_sum[[1,5]]) - abs(merged_diff_sum[[2,5]])))
+#avg_ph <- mean(avg_p_2,avg_p_1)
+```
+
+4/11 ARD/MAD swap
+```{r}
+merged_swap <- merged_all %>%
+  filter(date_time < ymd_hms("2023-04-11 18:00:00"), date_time > ymd_hms("2023-04-11 15:02:00"),
+         !(date_time < ymd_hms("2023-04-11 16:02:00") & date_time > ymd_hms("2023-04-11 15:55:00")))
+
+ggplot(merged_swap, aes(x=date_time)) +
+  geom_line(aes(y=p_h, color=logger, linetype=durafet)) +
+  #geom_point(aes(y=hobo_temp)) +
+  labs(x="Date and Time", y="pH", color = "") +
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%Y-%m-%d %H:%M")) +
+  #scale_color_brewer(palette="Set1", direction=-1, labels = c("Madgetech #1", "Madgetech #2")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top")
+
+merge_swap_diff <- merged_swap %>%
+  arrange(date_time) %>%
+  group_by(logger) %>%
+  mutate(diff_lag = abs(durafet_temp-lag(durafet_temp, default = first(durafet_temp)))) %>%
+  filter(!diff_lag > 0.25) %>%
+         #!diff_lag == 0) %>%
+  ungroup()
+
+ggplot(merge_swap_diff, aes(x=date_time)) +
+  geom_point(aes(y=diff_lag, color=logger))
+
+merged_diff <- merge_swap_diff %>%
+  mutate(period = ifelse(date_time<=ymd_hms("2023-04-11 16:00:00"), "1", "2")) %>%
+  arrange(date_time) %>%
+  group_by(period) %>%
+  mutate(diff_time = date_time-lag(date_time, default = first(date_time)),
+         diff_temp = durafet_temp-lag(durafet_temp, default=first(durafet_temp)),
+         diff_ph = p_h-lag(p_h, default=first(p_h))) %>%
+  filter(!diff_ph == 0,
+         !date_time == ymd_hms("2023-04-11 16:00:00")) %>%
+         #!(date_time > ymd_hms("2023-04-11 16:00:00") & date_time < ymd_hms("2023-04-11 16:01:00"))) %>%
+  ungroup() %>%
+  mutate(Durafet = ifelse(durafet=="green", "A", "B"))
+
+merged_diff_sum <- merged_diff %>%
+  group_by(period, logger, durafet) %>%
+  summarize(mean_temp = mean(durafet_temp),
+            sd_temp = sd(durafet_temp),
+            mean_ph = mean(p_h),
+            sd_ph = sd(p_h),
+            mean_diff_t = mean(diff_temp),
+            sd_diff_t = sd(diff_temp),
+            mean_diff_p = mean(diff_ph),
+            sd_diff_p = sd(diff_ph))
+
+period1 <- merged_diff %>%
+  filter(period==1)
+period2 <- merged_diff %>%
+  filter(period==2)
+
+ggplot(data=merged_diff, aes(x=date_time)) +
+  geom_line(data=period1, aes(y=diff_temp, color=logger, linetype=Durafet), size=1) +
+  geom_line(data=period2, aes(y=diff_temp, color=logger, linetype=Durafet), size=1) +
+  annotate("text", y=0.5, x=ymd_hms("2023-04-11 15:20:00"), label="Mean difference = 0.02") +
+  annotate("text", y=-0.5, x=ymd_hms("2023-04-11 15:20:00"), label="Mean difference = -0.02") +
+  annotate("text", y=0.5, x=ymd_hms("2023-04-11 16:30:00"), label="Mean difference = 0.90") +
+  annotate("text", y=-0.5, x=ymd_hms("2023-04-11 16:30:00"), label="Mean difference = -0.90") +
+  labs(x="Date and Time", y="Temperature difference (C)", color = "") +
+  
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%d %b %Y %H:%M")) +
+  scale_color_brewer(palette="Set1", direction=-1, labels = c("New Design", "Old Design")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top",
+        plot.margin = margin(0,0.1,0.1,0.6, "cm"))
+
+#ggsave(here("figures", "final", "temp-differenceARDnewcalib.png"), height=10, width=15, units="cm")
+
+ggplot(data=merged_diff, aes(x=date_time)) +
+  geom_line(data=period1, aes(y=diff_ph, color=logger, linetype=Durafet), size=1) +
+  geom_line(data=period2, aes(y=diff_ph, color=logger, linetype=Durafet), size=1) +
+  annotate("text", y=0.01, x=ymd_hms("2023-04-11 15:25:00"), label="Mean difference = 0.019") +
+  annotate("text", y=-0.01, x=ymd_hms("2023-04-11 15:25:00"), label="Mean difference = -0.019") +
+  annotate("text", y=0.01, x=ymd_hms("2023-04-11 16:30:00"), label="Mean difference = 0.025") +
+  annotate("text", y=-0.01, x=ymd_hms("2023-04-11 16:30:00"), label="Mean difference = -0.025") +
+  labs(x="Date and Time", y="pH difference", color = "") +
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%d %b %Y %H:%M")) +
+  scale_color_brewer(palette="Set1", direction=-1, labels = c("New Design", "Old Design")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top",
+        plot.margin = margin(0,0.1,0.1,0.6, "cm"))
+
+#ggsave(here("figures", "final", "ph-differenceARDnewcalib.png"), height=10, width=15, units="cm")
+
+avg_t_1 <- (abs(merged_diff_sum[[1,8]]) + abs(merged_diff_sum[[2,8]])) / 2
+avg_t_2 <- (abs(merged_diff_sum[[3,8]]) + abs(merged_diff_sum[[4,8]])) / 2
+avg_temp <- abs(avg_t_1-avg_t_2)
+
+avg_p_1 <- (abs(merged_diff_sum[[1,10]]) + abs(merged_diff_sum[[2,10]])) / 2
+avg_p_2 <- (abs(merged_diff_sum[[3,10]]) + abs(merged_diff_sum[[4,10]])) / 2
+avg_ph <- abs(avg_p_2-avg_p_1)
+
+write.csv(merged_diff_sum, here("data", "ard-mad.csv"),row.names = FALSE) # create csv with calibrated values
+```
+
+
+# Do this for the voltage data
+```{r}
+file_names <- list.files(here("data", "CLEAN"), pattern = ".csv", recursive = FALSE, full.names = TRUE)
+
+merged_all <- read_csv(file_names, col_names = TRUE) %>%
+  mutate(date_time = round_date(date_time, "5 seconds"))
+```
+
+4/11 SWAP
+```{r}
+merged_swap <- merged_all %>%
+  filter(date_time > ymd_hms("2023-04-11 12:00:00"), date_time < ymd_hms("2023-04-11 14:55:00")) %>%
+  mutate(logger = ifelse(date_time < ymd_hms("2023-04-11 15:00:00"), "madgetech_comp", logger),
+         logger = ifelse(date_time < ymd_hms("2023-04-11 13:45:00") & durafet == "green", "Madgetech-2",
+                         ifelse(date_time < ymd_hms("2023-04-11 13:45:00") & durafet == "red", "Madgetech-1",
+                         ifelse(date_time > ymd_hms("2023-04-11 13:45:00") & durafet == "red", "Madgetech-2",
+                                ifelse(date_time > ymd_hms("2023-04-11 13:45:00") & durafet == "green","Madgetech-1", "Madgetech-huh")))))
+
+ggplot(merged_swap, aes(x=date_time)) +
+  geom_line(aes(y=v4, color=logger, linetype=durafet)) +
+  #geom_point(aes(y=hobo_temp)) +
+  labs(x="Date and Time", y="pH", color = "") +
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%Y-%m-%d %H:%M")) +
+  #scale_color_brewer(palette="Set1", direction=-1, labels = c("Madgetech #1", "Madgetech #2")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top")
+
+merge_swap_diff <- merged_swap %>%
+  arrange(date_time) %>%
+  group_by(logger) %>%
+  mutate(diff_lag = abs(v4-lag(v4, default = first(v4)))) %>%
+  filter(!diff_lag > 0.2,
+         !diff_lag == 0) %>%
+  ungroup()
+
+merged_diff <- merge_swap_diff %>%
+  mutate(period = ifelse(date_time<=ymd_hms("2023-04-11 13:45:00"), "1", "2")) %>%
+  arrange(date_time) %>%
+  group_by(period) %>%
+  mutate(diff_time = date_time-lag(date_time, default = first(date_time)),
+         diff_temp = v4-lag(v4, default=first(v4)),
+         diff_ph = v1-lag(v1, default=first(v1))) %>%
+  filter(!(diff_ph > -1 & diff_ph < 1)) %>%
+  ungroup() %>%
+  mutate(Durafet = ifelse(durafet=="green", "A", "B"))
+
+merged_diff_sum <- merged_diff %>%
+  group_by(period, logger) %>%
+  summarize(mean_temp = mean(v4),
+            sd_temp = sd(v4),
+            mean_ph = mean(v1),
+            sd_ph = sd(v1),
+            mean_diff_t = mean(diff_temp),
+            sd_diff_t = sd(diff_temp),
+            mean_diff_p = mean(diff_ph),
+            sd_diff_p = sd(diff_ph))
+
+period1 <- merged_diff %>%
+  filter(period==1)
+period2 <- merged_diff %>%
+  filter(period==2)
+
+ggplot(data=merged_diff, aes(x=date_time)) +
+  geom_line(data=period1, aes(y=diff_temp, color=logger, linetype=Durafet), size=1) +
+  geom_line(data=period2, aes(y=diff_temp, color=logger, linetype=Durafet), size=1) +
+  
+  annotate("text", y=0.13, x=ymd_hms("2023-04-11 13:15:00"), label="Mean difference = 0.05") +
+  annotate("text", y=-0.13, x=ymd_hms("2023-04-11 13:15:00"), label="Mean difference = -0.06") +
+  annotate("text", y=0.05, x=ymd_hms("2023-04-11 14:15:00"), label="Mean difference = 0.12") +
+  annotate("text", y=-0.05, x=ymd_hms("2023-04-11 14:15:00"), label="Mean difference = -0.12") +
+  labs(x="Date and Time", y="Temperature difference (mV)", color = "") +
+  
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%d %b %Y %H:%M")) +
+  scale_color_manual(values=c("#E69F00", "#009E73"),labels = c("Old Design #1-Old Design #2", "Old Design #2-Old Design #1")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top",
+        plot.margin = margin(0,1.4,0.1,0.6, "cm"))
+
+#ggsave(here("figures", "final", "UPDATEDphtemp-differenceMADmV.png"), height=10, width=15, units="cm")
+
+ggplot(data=merged_diff, aes(x=date_time)) +
+  geom_line(data=period1, aes(y=diff_ph, color=logger, linetype=Durafet), size=1) +
+  geom_line(data=period2, aes(y=diff_ph, color=logger, linetype=Durafet), size=1) +
+  annotate("text", y=20, x=ymd_hms("2023-04-11 13:15:00"), label="Mean difference = 31.6") +
+  annotate("text", y=-20, x=ymd_hms("2023-04-11 13:15:00"), label="Mean difference = -31.6") +
+  annotate("text", y=20, x=ymd_hms("2023-04-11 14:15:00"), label="Mean difference = 32.3") +
+  annotate("text", y=-20, x=ymd_hms("2023-04-11 14:15:00"), label="Mean difference = -32.3") +
+  labs(x="Date and Time", y="pH difference (mV)", color = "") +
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%d %b %Y %H:%M")) +
+  scale_color_manual(values=c("#E69F00", "#009E73"),labels = c("Old Design #1-Old Design #2", "Old Design #2-Old Design #1")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top",
+        plot.margin = margin(0,1.4,0.1,0.6, "cm"))
+
+#ggsave(here("figures", "final", "UPDATEDph-differenceMADmV.png"), height=10, width=15, units="cm")
+
+avg_t_1 <- (abs(merged_diff_sum[[1,7]]) + abs(merged_diff_sum[[2,7]])) / 2
+avg_t_2 <- (abs(merged_diff_sum[[3,7]]) + abs(merged_diff_sum[[4,7]])) / 2
+avg_temp <- avg_t_1-avg_t_2
+
+avg_p_1 <- (abs(merged_diff_sum[[1,9]]) + abs(merged_diff_sum[[2,9]])) / 2
+avg_p_2 <- (abs(merged_diff_sum[[3,9]]) + abs(merged_diff_sum[[4,9]])) / 2
+avg_ph <- avg_p_2-avg_p_1
+
+avg_t_1 <- abs((abs(merged_diff_sum[[1,3]]) - abs(merged_diff_sum[[2,3]])))
+avg_t_2 <- abs((abs(merged_diff_sum[[3,3]]) - abs(merged_diff_sum[[4,3]])))
+avg_temp <- (avg_t_1+avg_t_2)/2
+
+avg_p_1 <- abs((abs(merged_diff_sum[[1,5]]) - abs(merged_diff_sum[[2,5]])))
+avg_p_2 <- abs((abs(merged_diff_sum[[1,5]]) - abs(merged_diff_sum[[2,5]])))
+avg_ph <- mean(avg_p_2,avg_p_1)
+
+#write.csv(merged_diff_sum, here("data", "madge-madge.csv"),row.names = FALSE) # create csv with calibrated values
+```
+
+4/9 SWAP
+```{r}
+merged_swap <- merged_all %>%
+  filter(date_time < ymd_hms("2023-04-09 18:00:00"), date_time > ymd_hms("2023-04-09 15:00:00")) %>%
+  mutate(date_time = round_date(date_time, "15 seconds"))
+#for ARD vs MAD 4/9
+   
+ggplot(merged_swap, aes(x=date_time)) +
+  geom_point(aes(y=v1, color=logger)) +
+  #geom_point(aes(y=hobo_temp)) +
+  labs(x="Date and Time", y="pH", color = "") +
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%Y-%m-%d %H:%M")) +
+  scale_color_brewer(palette="Set1", direction=-1, labels = c("New Design", "Old Design", "Madgetech #1", "Madgetech #2")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top")
+
+merge_swap_diff <- merged_swap %>%
+  arrange(date_time) %>%
+  group_by(logger) %>%
+  mutate(diff_lag = abs(v4-lag(v4, default = first(v4)))) %>%
+  filter(!diff_lag > 0.2) %>%
+         #!diff_lag > 0.05) %>% #remove lag values associated with start time
+  ungroup()
+
+ggplot(merge_swap_diff, aes(x=date_time)) +
+  geom_point(aes(y=diff_lag, color=logger))
+
+merged_diff <- merge_swap_diff %>%
+  mutate(period = ifelse(date_time <= ymd_hms("2023-04-09 16:00:00"), "1", "2")) %>% #for ARD vs MAD 4/9 comparison
+  arrange(date_time) %>%
+  group_by(period) %>%
+  mutate(diff_time = date_time-lag(date_time, default = first(date_time)),
+         diff_temp = v4-lag(v4, default=first(v4)),
+         diff_ph = v1-lag(v1, default=first(v1))) %>%
+  ungroup() %>%
+  mutate(Durafet = ifelse(durafet=="green", "A", "B")) %>%
+#%>%
+  slice(2:n()) %>%
+  filter(!date_time == ymd_hms("2023-04-09 16:05:45"))
+  ## DO BELOW ONLY FOR GRAPHS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  #mutate(logger = ifelse(logger == "Madgetech-2", "madgetech", logger))
+
+merged_diff_sum <- merged_diff %>%
+  group_by(period, logger) %>%
+  summarize(mean_temp = mean(v4),
+            sd_temp = sd(v4),
+            mean_ph = mean(v1),
+            sd_ph = sd(v1),
+            mean_diff_t = mean(diff_temp),
+            sd_diff_t = sd(diff_temp),
+            mean_diff_p = mean(diff_ph),
+            sd_diff_p = sd(diff_ph))
+
+period1 <- merged_diff %>%
+  filter(period==1)
+period2 <- merged_diff %>%
+  filter(period==2)
+
+ggplot(data=merged_diff, aes(x=date_time)) +
+  geom_line(data=period1, aes(y=diff_temp, color=logger, linetype=Durafet), size=1) +
+  geom_line(data=period2, aes(y=diff_temp, color=logger, linetype=Durafet), size=1) +
+  
+  annotate("text", y=0.4, x=ymd_hms("2023-04-09 15:30:00"), label="Mean difference = 0.67") +
+  annotate("text", y=-0.4, x=ymd_hms("2023-04-09 15:30:00"), label="Mean difference = -0.67") +
+  annotate("text", y=0.4, x=ymd_hms("2023-04-09 16:40:00"), label="Mean difference = 0.87") +
+  annotate("text", y=-0.4, x=ymd_hms("2023-04-09 16:40:00"), label="Mean difference = -0.86") +
+  labs(x="Date and Time", y="Temperature difference (C)", color = "") +
+  
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%d %b %Y %H:%M")) +
+  scale_color_brewer(palette="Set1", direction=-1, labels = c("New Design", "Old Design")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top",
+        plot.margin = margin(0,0.1,0.1,0.6, "cm"))
+
+#ggsave(here("figures", "final", "UPDATEDtemp-differenceARDmV.png"), height=10, width=15, units="cm")
+
+ggplot(data=merged_diff, aes(x=date_time)) +
+  geom_line(data=period1, aes(y=diff_ph, color=logger, linetype=Durafet), size=1) +
+  geom_line(data=period2, aes(y=diff_ph, color=logger, linetype=Durafet), size=1) + 
+  
+  annotate("text", y=0.05, x=ymd_hms("2023-04-09 15:30:00"), label="Mean difference = 0.106") +
+  annotate("text", y=-0.05, x=ymd_hms("2023-04-09 15:30:00"), label="Mean difference = -0.106") +
+  annotate("text", y=0.06, x=ymd_hms("2023-04-09 16:40:00"), label="Mean difference = 0.029") +
+  annotate("text", y=-0.06, x=ymd_hms("2023-04-09 16:40:00"), label="Mean difference = -0.029") +
+  labs(x="Date and Time", y="Temperature difference (C)", color = "") +
+  
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%d %b %Y %H:%M")) +
+  scale_color_brewer(palette="Set1", direction=-1, labels = c("New Design", "Old Design")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top",
+        plot.margin = margin(0,0.1,0.1,0.6, "cm"))
+
+#ggsave(here("figures", "final", "UPDATEDph-differenceARDmV.png"), height=10, width=15, units="cm")
+
+avg_t_1 <- (abs(merged_diff_sum[[1,7]]) + abs(merged_diff_sum[[2,7]])) / 2
+avg_t_2 <- (abs(merged_diff_sum[[3,7]]) + abs(merged_diff_sum[[4,7]])) / 2
+avg_temp <- avg_t_1-avg_t_2
+
+avg_p_1 <- (abs(merged_diff_sum[[1,9]]) + abs(merged_diff_sum[[2,9]])) / 2
+avg_p_2 <- (abs(merged_diff_sum[[3,9]]) + abs(merged_diff_sum[[4,9]])) / 2
+avg_ph <- avg_p_2-avg_p_1
+
+
+
+avg_t_1 <- abs((abs(merged_diff_sum[[1,3]]) - abs(merged_diff_sum[[2,3]])))
+avg_t_2 <- abs((abs(merged_diff_sum[[3,3]]) - abs(merged_diff_sum[[4,3]])))
+avg_temp <- (avg_t_1+avg_t_2)/2
+
+avg_p_1 <- abs((abs(merged_diff_sum[[1,5]]) - abs(merged_diff_sum[[2,5]])))
+avg_p_2 <- abs((abs(merged_diff_sum[[1,5]]) - abs(merged_diff_sum[[2,5]])))
+avg_ph <- mean(avg_p_2,avg_p_1)
+```
+
+4/11 ARD/MAD swap
+```{r}
+merged_swap <- merged_all %>%
+  filter(date_time < ymd_hms("2023-04-11 18:00:00"), date_time > ymd_hms("2023-04-11 14:55:00"))
+
+ggplot(merged_swap, aes(x=date_time)) +
+  geom_line(aes(y=v4, color=logger, linetype=durafet)) +
+  #geom_point(aes(y=hobo_temp)) +
+  labs(x="Date and Time", y="pH", color = "") +
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%Y-%m-%d %H:%M")) +
+  #scale_color_brewer(palette="Set1", direction=-1, labels = c("Madgetech #1", "Madgetech #2")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top")
+
+merge_swap_diff <- merged_swap %>%
+  arrange(date_time) %>%
+  group_by(logger) %>%
+  mutate(diff_lag = abs(v4-lag(v4, default = first(v4)))) %>%
+  filter(!diff_lag > 0.25) %>%
+         #!diff_lag == 0) %>%
+  ungroup()
+
+ggplot(merge_swap_diff, aes(x=date_time)) +
+  geom_point(aes(y=diff_lag, color=logger))
+
+merged_diff <- merge_swap_diff %>%
+  mutate(period = ifelse(date_time<=ymd_hms("2023-04-11 16:00:00"), "1", "2")) %>%
+  arrange(date_time) %>%
+  group_by(period) %>%
+  mutate(diff_time = date_time-lag(date_time, default = first(date_time)),
+         diff_temp = v4-lag(v4, default=first(v4)),
+         diff_ph = v1-lag(v1, default=first(v1))) %>%
+  filter(!diff_ph == 0,
+         !date_time == ymd_hms("2023-04-11 16:00:00")) %>%
+         #!(date_time > ymd_hms("2023-04-11 16:00:00") & date_time < ymd_hms("2023-04-11 16:01:00"))) %>%
+  ungroup() %>%
+  mutate(Durafet = ifelse(durafet=="green", "A", "B"))
+
+merged_diff_sum <- merged_diff %>%
+  group_by(period, logger) %>%
+  summarize(mean_temp = mean(v4),
+            sd_temp = sd(v4),
+            mean_ph = mean(v1),
+            sd_ph = sd(v1),
+            mean_diff_t = mean(diff_temp),
+            sd_diff_t = sd(diff_temp),
+            mean_diff_p = mean(diff_ph),
+            sd_diff_p = sd(diff_ph))
+
+period1 <- merged_diff %>%
+  filter(period==1)
+period2 <- merged_diff %>%
+  filter(period==2)
+
+ggplot(data=merged_diff, aes(x=date_time)) +
+  geom_line(data=period1, aes(y=diff_temp, color=logger, linetype=Durafet), size=1) +
+  geom_line(data=period2, aes(y=diff_temp, color=logger, linetype=Durafet), size=1) +
+  annotate("text", y=0.5, x=ymd_hms("2023-04-11 15:25:00"), label="Mean difference = 1.68") +
+  annotate("text", y=-0.5, x=ymd_hms("2023-04-11 15:25:00"), label="Mean difference = -1.68") +
+  annotate("text", y=0.5, x=ymd_hms("2023-04-11 16:35:00"), label="Mean difference = 1.41") +
+  annotate("text", y=-0.5, x=ymd_hms("2023-04-11 16:35:00"), label="Mean difference = -1.42") +
+  labs(x="Date and Time", y="Temperature difference (mV)", color = "") +
+  
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%d %b %Y %H:%M")) +
+  scale_color_brewer(palette="Set1", direction=-1, labels = c("New Design-Old Design", "Old Design-New Design")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top",
+        plot.margin = margin(0,0.4,0.1,0.6, "cm"))
+
+#ggsave(here("figures", "final", "UPDATEDtemp-differenceARDmV.png"), height=10, width=15, units="cm")
+
+ggplot(data=merged_diff, aes(x=date_time)) +
+  geom_line(data=period1, aes(y=diff_ph, color=logger, linetype=Durafet), size=1) +
+  geom_line(data=period2, aes(y=diff_ph, color=logger, linetype=Durafet), size=1) +
+  annotate("text", y=20, x=ymd_hms("2023-04-11 15:25:00"), label="Mean difference = 32.1") +
+  annotate("text", y=-20, x=ymd_hms("2023-04-11 15:25:00"), label="Mean difference = -32.1") +
+  annotate("text", y=20, x=ymd_hms("2023-04-11 16:35:00"), label="Mean difference = 32.0") +
+  annotate("text", y=-20, x=ymd_hms("2023-04-11 16:35:00"), label="Mean difference = -32.0") +
+  labs(x="Date and Time", y="pH difference (mV)", color = "") +
+  scale_x_datetime(breaks = scales::date_breaks("30 min"), 
+                   labels = date_format("%d %b %Y %H:%M")) +
+  scale_color_brewer(palette="Set1", direction=-1, labels = c("New Design-Old Design", "Old Design-New Design")) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
+        legend.position = "top",
+        plot.margin = margin(0,0.4,0.1,0.6, "cm"))
+
+#ggsave(here("figures", "final", "UPDATEDph-differenceARDmV.png"), height=10, width=15, units="cm")
+
+avg_t_1 <- (abs(merged_diff_sum[[1,7]]) + abs(merged_diff_sum[[2,7]])) / 2
+avg_t_2 <- (abs(merged_diff_sum[[3,7]]) + abs(merged_diff_sum[[4,7]])) / 2
+avg_temp <- avg_t_1-avg_t_2
+
+avg_p_1 <- (abs(merged_diff_sum[[1,9]]) + abs(merged_diff_sum[[2,9]])) / 2
+avg_p_2 <- (abs(merged_diff_sum[[3,9]]) + abs(merged_diff_sum[[4,9]])) / 2
+avg_ph <- avg_p_2-avg_p_1
+
+
+avg_t_1 <- abs((abs(merged_diff_sum[[1,3]]) - abs(merged_diff_sum[[2,3]])))
+avg_t_2 <- abs((abs(merged_diff_sum[[3,3]]) - abs(merged_diff_sum[[4,3]])))
+avg_temp <- (avg_t_1+avg_t_2)/2
+
+avg_p_1 <- abs((abs(merged_diff_sum[[1,5]]) - abs(merged_diff_sum[[2,5]])))
+avg_p_2 <- abs((abs(merged_diff_sum[[1,5]]) - abs(merged_diff_sum[[2,5]])))
+avg_ph <- mean(avg_p_2,avg_p_1)
+
+#write.csv(merged_diff_sum, here("data", "ard-madge.csv"),row.names = FALSE) # create csv with calibrated values
+
+```
+

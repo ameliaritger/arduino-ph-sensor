@@ -1,0 +1,223 @@
+---
+title: "compare madgetech and arduino reads"
+author: "Amelia Ritger"
+date: "2022-12-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load libraries
+```{r}
+library(tidyverse)
+library(here)
+library(lubridate)
+
+pattern_keep = "1215" #set the date of interest
+start_time <-  "12-15-2022 11:00:00" #to remove 12-16-2022 14:30:00 12-15-2022 11:00:00, 12-14-2022 18:00:00
+end_time <- "12-15-2022 12:00:00" #to remove 12-16-2022 15:30:00 12-15-2022 12:00:00, 12-14-2022 18:30:00
+```
+
+Load sensor data
+```{r}
+pattern_remove_deploy = "depl" #exclude deploy files
+pattern_remove_calib = "_calib" #exclude calibration files
+
+files_all <- list.files(here("data", "calibrated"), pattern = pattern_keep, recursive = FALSE, full.names = TRUE)
+files_tris <- list.files(here("data", "calibrated"), pattern = pattern_remove_deploy, recursive = FALSE, ignore.case = TRUE, full.names = TRUE)
+files_calib <- list.files(here("data", "calibrated"), pattern = pattern_remove_calib, recursive = FALSE, full.names = TRUE)
+file_names <- setdiff(files_all, files_tris)
+file_names <- setdiff(file_names, files_calib)
+
+merged <- read_csv(file_names, col_names = TRUE) %>%
+  filter(date_time >= mdy_hms(start_time),
+         date_time <= mdy_hms(end_time))
+```
+
+Load and merge hobo logger data
+```{r}
+temp <- read_csv(here("data", "temp", paste(pattern_keep,"_hobo_tris.csv", sep="")), col_names = TRUE) %>%
+  select(2:3) %>%
+  setNames(c("date_time", "hobo_temp")) %>%
+  mutate(date_time=mdy_hms(date_time), #aapply lubridate to date/time column
+         logger = "hobo") 
+         #date=format(date_time, '%m/%d/%Y'), #create only date column
+         #time=format(date_time, '%H:%M:%S')) #create only time column
+
+merged_all <- full_join(merged, temp) %>%
+  filter(date_time >= mdy_hms(start_time),
+         date_time <= mdy_hms(end_time))
+```
+
+
+Plot up Arduino data comparison
+```{r}
+ggplot(data=merged_all, aes(x=date_time)) +
+  geom_point(aes(y=durafet_temp, color=logger))
+```
+
+
+```{r}
+library(ggpmisc)
+
+merged_comp <- merged_all %>%
+  filter(tolerance=="ideal" | is.na(tolerance)) %>%
+  mutate(logger = ifelse(is.na(logger), "hobo", logger),
+         temp_c = ifelse(logger=="hobo", hobo_temp, durafet_temp))
+
+ggplot(data=merged_comp, aes(x=date_time, y=temp_c, group = logger)) +
+  geom_point(aes(color=logger))
+  #stat_poly_line() +
+  #stat_poly_eq(aes(label = paste(after_stat(eq.label)))) +
+  scale_y_continuous(limits=c(18.0, 21.5))
+
+ggsave(here("figures", "REDO-temp_without_correction.png"))
+```
+
+Get average difference between hobo and each logger to plot difference across temperature
+```{r}
+merge_hobo <- merged_all %>%
+  filter(tolerance=="ideal" | is.na(tolerance)) %>%
+  arrange(date_time) %>%
+  mutate(diff = date_time-lag(date_time, default = first(date_time))) %>%
+  mutate(temp_down = hobo_temp,
+         temp_up = hobo_temp) %>%
+  fill(temp_down, .direction = "down") %>%
+  fill(temp_up, .direction = "up") %>%
+  mutate(hobo_real = ifelse(diff<20,temp_up,temp_down),
+         durafet_fill = ifelse(is.na(hobo_temp),durafet_temp, hobo_real)) %>%
+  mutate(temp_diff = hobo_real - durafet_temp) %>%
+  filter(!is.na(temp_diff)) %>%
+  group_by(logger) %>%
+  summarize(mean_diff = mean(temp_diff),
+            mean_temp = mean(durafet_fill))
+
+hobo_comp_tris_15 <- merge_hobo
+```
+
+```{r}
+pattern_keep = "1216" #set the date of interest
+start_time <-  "12-16-2022 14:30:00" #to remove 12-16-2022 14:30:00 12-15-2022 11:00:00, 12-14-2022 18:00:00
+end_time <- "12-16-2022 15:30:00" #to remove 12-16-2022 15:30:00 12-15-2022 12:00:00, 12-14-2022 18:30:00
+
+pattern_remove_deploy = "depl" #exclude deploy files
+pattern_remove_calib = "_calib" #exclude calibration files
+
+files_all <- list.files(here("data", "calibrated"), pattern = pattern_keep, recursive = FALSE, full.names = TRUE)
+files_tris <- list.files(here("data", "calibrated"), pattern = pattern_remove_deploy, recursive = FALSE, ignore.case = TRUE, full.names = TRUE)
+files_calib <- list.files(here("data", "calibrated"), pattern = pattern_remove_calib, recursive = FALSE, full.names = TRUE)
+file_names <- setdiff(files_all, files_tris)
+file_names <- setdiff(file_names, files_calib)
+
+merged <- read_csv(file_names, col_names = TRUE) %>%
+  filter(date_time >= mdy_hms(start_time),
+         date_time <= mdy_hms(end_time))
+
+temp <- read_csv(here("data", "temp", paste(pattern_keep,"_hobo_tris.csv", sep="")), col_names = TRUE) %>%
+  select(2:3) %>%
+  setNames(c("date_time", "hobo_temp")) %>%
+  mutate(date_time=mdy_hms(date_time), #aapply lubridate to date/time column
+         logger = "hobo") 
+         #date=format(date_time, '%m/%d/%Y'), #create only date column
+         #time=format(date_time, '%H:%M:%S')) #create only time column
+
+merged_all <- full_join(merged, temp) %>%
+  filter(date_time >= mdy_hms(start_time),
+         date_time <= mdy_hms(end_time))
+
+merge_hobo <- merged_all %>%
+  filter(tolerance=="ideal" | is.na(tolerance)) %>%
+  arrange(date_time) %>%
+  mutate(diff = date_time-lag(date_time, default = first(date_time))) %>%
+  mutate(temp_down = hobo_temp,
+         temp_up = hobo_temp) %>%
+  fill(temp_down, .direction = "down") %>%
+  fill(temp_up, .direction = "up") %>%
+  mutate(hobo_real = ifelse(diff<20,temp_up,temp_down),
+         durafet_fill = ifelse(is.na(hobo_temp),durafet_temp, hobo_real)) %>%
+  mutate(temp_diff = hobo_real - durafet_temp) %>%
+  filter(!is.na(temp_diff)) %>%
+  group_by(logger) %>%
+  summarize(mean_diff = mean(temp_diff),
+            mean_temp = mean(durafet_fill))
+
+hobo_comp_tris_16 <- merge_hobo
+```
+
+```{r}
+pattern_keep = "1219" #set the date of interest
+pattern_remove_deploy = "depl" #exclude deploy files
+pattern_remove_calib = "_calib" #exclude calibration files
+
+files_all <- list.files(here("data", "calibrated"), pattern = pattern_keep, recursive = FALSE, full.names = TRUE)
+files_tris <- list.files(here("data", "calibrated"), pattern = pattern_remove_deploy, recursive = FALSE, ignore.case = TRUE, full.names = TRUE)
+files_calib <- list.files(here("data", "calibrated"), pattern = pattern_remove_calib, recursive = FALSE, full.names = TRUE)
+file_names <- setdiff(files_all, files_tris)
+file_names <- setdiff(file_names, files_calib)
+
+merged <- read_csv(file_names, col_names = TRUE)
+
+temp <- read_csv(here("data", "temp", paste(pattern_keep,"_hobo_tris.csv", sep="")), col_names = TRUE) %>%
+  select(2:3) %>%
+  setNames(c("date_time", "hobo_temp")) %>%
+  mutate(date_time=mdy_hms(date_time), #aapply lubridate to date/time column
+         logger = "hobo") 
+         #date=format(date_time, '%m/%d/%Y'), #create only date column
+         #time=format(date_time, '%H:%M:%S')) #create only time column
+
+ggplot(temp, aes(x=date_time, y=hobo_temp)) +
+  geom_point()
+#that fridge temp is fuuucked, I'm not using that run at ALL....
+
+#merged_all <- full_join(merged, temp) %>%
+#  filter(date_time >= mdy_hms("12-19-2022 10:05:00"),
+#         date_time <= mdy_hms("12-19-2022 11:30:00")) %>%
+#  filter(date_time <= mdy_hms("12-19-2022 10:35:00") | date_time >= mdy_hms("12-19-2022 11:00:00")) 
+
+#merged_comp <- merged_all %>%
+#  filter(tolerance=="ideal" | is.na(tolerance)) %>%
+#  mutate(logger = ifelse(is.na(logger), "hobo", logger),
+#         temp_c = ifelse(logger=="hobo", hobo_temp, durafet_temp))
+
+#ggplot(merged_comp, aes(x=date_time, y=temp_c)) +
+#  geom_point(aes(color=logger))
+```
+
+Save the data as a .csv
+```{r}
+merge_temp_diff <- full_join(hobo_comp_tris_15, hobo_comp_tris_16)
+#merge_temp_diff <- full_join(merge_temp_diff, hobo_comp_tris_14)
+#merge_temp_diff <- full_join(merge_temp_diff, log_comp_deploy)
+#merge_temp_diff <- full_join(merge_temp_diff, hobo_comp_tris_swap)
+
+write_csv(merge_temp_diff, here("data", "temp", "logger_correction-madgetech.csv"))
+```
+
+Get average difference between arduino and madgetech to plot difference across temperature
+```{r}
+merge_comp <- merged %>%
+  filter(tolerance=="ideal" | is.na(tolerance)) %>%
+  arrange(date_time) %>%
+  mutate(diff_time = date_time-lag(date_time, default = first(date_time)),
+         diff_temp = durafet_temp-lag(durafet_temp, default=first(durafet_temp))) %>%
+  filter(diff_temp > 0.01 | diff_temp < -0.01) %>%
+  mutate(diff_time = date_time-lag(date_time, default = first(date_time)),
+         diff_temp = durafet_temp-lag(durafet_temp, default=first(durafet_temp))) %>%
+    slice(2:n()) %>%
+  filter(logger=="arduino") %>%
+  summarize(mean_diff = mean(diff_temp),
+            mean_temp = mean(durafet_temp))
+  
+  #filter(logger=="madgetech") %>%
+  #summarize(mean_diff = mean(diff_temp),
+  #          mean_temp = mean(durafet_temp))
+
+  #filter(date_time > ymd_hms("2022-12-15 11:02:40"),
+  #       logger=="madgetech") %>%
+  #summarize(mean_diff = mean(diff_temp),
+  #          mean_temp = mean(durafet_temp))
+
+log_comp_tris_14 <- merge_comp
+```
