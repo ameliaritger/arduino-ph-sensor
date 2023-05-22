@@ -1,4 +1,7 @@
-// sample many times and log raw oversampling data for later processing
+// 1. ONE SAMPLE EVERY 20 SECONDS. DO FOR MADGE + ARD
+// 2. OVERSAMPLE 64x, 128x, 256x
+// 3. DURAFET POWER DRAW?
+// 4. SLEEP MODE vs. NOT SLEEP MODE.
 
 #include <SPI.h>
 #include <SD.h>
@@ -25,6 +28,8 @@ char timestamp[32]; // Current time from the RTC in text format, 32 bytes long
 bool alarmTrigger = true; // Create variable set to false for alarm nesting. Set to true if you want immediate start time.
 
 int16_t adc2_1, adc2_2, adc2_diff, adc1_1, adc1_diff; //adc1_2 for coin batt
+int oversampleArray[OVERSAMPLE_VALUE]; // generate array for oversampling
+float oversampleMean;
 
 // Function to print a timestamp ("last modified") callback to the SD card
 void SDfileDate(uint16_t* date, uint16_t* time) {
@@ -72,11 +77,11 @@ void setup()
     Serial << "Opening file..." << endl;
     datafile = SD.open(FILE_NAME, FILE_WRITE); // open the file
     Serial << "Writing header..." << endl;
-    datafile << "Date,Time,J1,J1 (mV),J2,J2 (mV),J3,J3 (mV),J4+,J4+ (mV),J4-,J4- (mV)" << endl; // removed "Coin battery (mV)"
+    datafile << "Date,Time,J1 (mV),J1 oversampled mean (mV),J1 oversampled mean,J1 oversampled min,J1 oversampled max,J1 oversampled sd,J2+ (mV),J3 (mV),J4+ (mV),J4+ oversampled mean (mV),J4+ oversampled mean,J4+ oversampled min,J4+ oversampled max,J4+ oversampled sd,J4- (mV),J4- oversampled mean (mV),J4- oversampled mean,J4- oversampled min,J4- oversampled max,J4- oversampled sd" << endl; // removed "Coin battery (mV)"
     datafile.close(); // close the file
     Serial << "Done." << endl;
   }
- 
+
   // Initialize the alarms, clear the alarm flags, clear the alarm interrupt flags
   rtc.begin();
   rtc.setAlarm(DS3232RTC::ALM1_MATCH_DATE, 0, 0, 0, 1);
@@ -99,15 +104,6 @@ void setup()
   rtc.alarm(DS3232RTC::ALARM_1); // clear the alarm flag
   rtc.setAlarm(DS3232RTC::ALM2_MATCH_DATE, 0, START_MIN, START_HOUR, START_DAY); // set Alarm 2 to occur at specific date and time
   rtc.alarm(DS3232RTC::ALARM_2); // clear the alarm flag
-
-  // Arduino low power mode until the alarm is triggered
-  //while (!rtc.alarm(DS3232RTC::ALARM_2)) {
-  //  LowPower.sleep(1000); // Sleep for 1 second
-  //}
-
-  //time_t startTime = rtc.get();
-  //formatTime(timestamp, startTime);
-  //Serial << "IT'S TIME TO START SAMPLING! " << timestamp << endl; // print the time when this part of the loop is running
 
   //Setup ADC 1015 and 1115
   Serial << "Getting differential reading from AIN0 (P) and AIN1 (N)" << endl;
@@ -141,33 +137,36 @@ void loop()
 
     if (datafile) { // if the file opened okay, write to it:
       Serial << "Writing to SD Card..." << endl;
-      
-      // LOG ADC INPUTS MANY TIMES IN A ROW
-      for (int i = 0; i < OVERSAMPLE_VALUE; i++) {
-        time_t TIME = rtc.get();
-        datafile << month(TIME) << "/" << day(TIME) << "/" << year(TIME) << "," << hour(TIME) << ":" << minute(TIME) << ":" << second(TIME) << "," ;
-        ////////////////////////*****Read ADC Inputs*****///////////////////////////////////////////////////////////////////////
+      time_t TIME = rtc.get();
+      datafile << month(TIME) << "/" << day(TIME) << "/" << year(TIME) << "," << hour(TIME) << ":" << minute(TIME) << ":" << second(TIME) << "," ;
 
-        adc2_diff = ads1115.readADC_Differential_0_1(); // Read J1 pin (A0/A1 differential)
-        Serial << "J1 differential: " << adc2_diff << "(" << adc2_diff * ADS1115_GAIN_MULT << "mV)" << endl;
-        datafile << adc2_diff << "," << adc2_diff * ADS1115_GAIN_MULT << ","; //J1
+      ////////////////////////*****Read ADC Inputs*****///////////////////////////////////////////////////////////////////////
 
-        adc1_1 = ads1015.readADC_SingleEnded(2); // Read J2 pin (A2)
-        Serial << "J2+: " << adc1_1 << "(" << adc1_1 * ADS1015_GAIN_MULT << "mV)" << endl;
-        datafile << adc1_1 << "," << adc1_1 * ADS1015_GAIN_MULT << ","; //J2
+      adc2_diff = ads1115.readADC_Differential_0_1(); // Read J1 pin (A0/A1 differential)
+      Serial << "J1 differential: " << adc2_diff << "(" << adc2_diff * ADS1115_GAIN_MULT << "mV)" << endl;
+      oversample(&ads1115, oversampleArray, 0);
+      oversampleMean = sampleMean(oversampleArray);
+      datafile << adc2_diff * ADS1115_GAIN_MULT << "," << oversampleMean * ADS1115_GAIN_MULT << "," << oversampleMean << ","; //J1
 
-        adc1_diff = ads1015.readADC_Differential_0_1(); //Read J3 pin (A0/A1 differential)
-        Serial << "J3 differential: " << adc1_diff << "(" << adc1_diff * ADS1015_GAIN_MULT << "mV)" << endl;
-        datafile << adc1_diff << "," << adc1_diff * ADS1015_GAIN_MULT << ","; //J3
+      adc1_1 = ads1015.readADC_SingleEnded(2); // Read J2 pin (A2)
+      Serial << "J2+: " << adc1_1 << "(" << adc1_1 * ADS1015_GAIN_MULT << "mV)" << endl;
+      datafile << adc1_1 * ADS1015_GAIN_MULT << ","; //J2
 
-        adc2_1 = ads1115.readADC_SingleEnded(2); // Read A2 (J4-)
-        Serial << "J4+: " << adc2_1 << "(" << adc2_1 * ADS1115_GAIN_MULT << "mV)" << endl;
-        datafile << adc2_1 << "," << adc2_2 * ADS1115_GAIN_MULT << ","; //J4-
+      adc1_diff = ads1015.readADC_Differential_0_1(); //Read J3 pin (A0/A1 differential)
+      Serial << "J3 differential: " << adc1_diff << "(" << adc1_diff * ADS1015_GAIN_MULT << "mV" << endl;
+      datafile << adc1_diff * ADS1015_GAIN_MULT << ","; //J3
 
-        adc2_2 = ads1115.readADC_SingleEnded(3); // Read A3
-        Serial << "J4-: " << adc2_2 << "(" << adc2_2 * ADS1115_GAIN_MULT << "mV)" << endl;
-        datafile << adc2_2 << "," << adc2_2 * ADS1115_GAIN_MULT << endl; //J4-
-      }
+      adc2_1 = ads1115.readADC_SingleEnded(2); // Read A2
+      Serial << "J4+: " << adc2_1 << "(" << adc2_1 * ADS1115_GAIN_MULT << "mV)" << endl;
+      oversample(&ads1115, oversampleArray, 2);
+      oversampleMean = sampleMean(oversampleArray);
+      datafile << adc2_1 * ADS1115_GAIN_MULT << "," << oversampleMean * ADS1115_GAIN_MULT << "," << oversampleMean << ","; //J4+
+
+      adc2_2 = ads1115.readADC_SingleEnded(3); // Read A3
+      Serial << "J4-: " << adc2_2 << "(" << adc2_2 * ADS1115_GAIN_MULT << "mV)" << endl;
+      oversample(&ads1115, oversampleArray, 3);
+      oversampleMean = sampleMean(oversampleArray);
+      datafile << adc2_2 * ADS1115_GAIN_MULT << "," << oversampleMean * ADS1115_GAIN_MULT << "," << oversampleMean << endl; //J4-
 
       ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -183,6 +182,6 @@ void loop()
     //delay(1000); // keep LED on for 1 second
     //digitalWrite(ledPin, LOW); // turn LED off
 
-    //LowPower.deepSleep(5000); // deep sleep for 5 seconds. This will break the Serial, but will still log. Maybe do deep sleep?
+    LowPower.deepSleep(5000); // deep sleep for 5 seconds. This will break the Serial, but the loop will still be running.
   }
 }
