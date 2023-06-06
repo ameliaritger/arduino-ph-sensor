@@ -10,24 +10,24 @@ This repository is maintained by Hofmann Lab graduate student Amelia Ritger (Git
 ## How is this repository structured?
 ```
 .
-├── documentation/                                    # folder containing documentation for building the Arduino data logger for the pH sensor project
-│   └── arduinoPHConstructionOperation.docx           # document for building the Arduino data logger
+├── documentation/                              # folder containing documentation for building the Arduino data logger for the pH sensor project
+│   └── arduinoPHConstructionOperation.docx     # document for building the Arduino data logger
 |
-├── software/                     # folder containing the shiny dashboard 
-|   └── arduinoCode/                             # markdown files containing text to be used throughout the app
-|      └── CONFIG.h                       # caption for danner boots photo in gear garage
-|      └── SRC.h                    # title and caption for DT dataTable
-|      └── arduinoCode.ino                  # gear garage box title and description
+├── software/                                   # folder containing the shiny dashboard 
+|   └── arduinoCode/                            # markdown files containing text to be used throughout the app
+|      └── CONFIG.h                             # caption for danner boots photo in gear garage
+|      └── SRC.h                                # title and caption for DT dataTable
+|      └── arduinoCode.ino                      # gear garage box title and description
 |           
-|   └── rCode/                              # special directory in shiny for images, stylesheets, etc. 
-|      └── Final_OMEGAS.Rmd                          # photos & logos used throughout app
-|      └── Final_Tris_Cal.Rmd               # photos to be used in the 'Photos' tab (NOT WORKING YET)
-|      └── Final_deploy_voltages.Rmd                      # stylesheet for customzing dashboard
-|      └── Final_standardize_data.Rmd                 # created when `fresh_theme.R` is run (NOT WORKING/USED YET)
+|   └── rCode/                                  # special directory in shiny for images, stylesheets, etc. 
+|      └── Final_OMEGAS.Rmd                     # photos & logos used throughout app
+|      └── Final_Tris_Cal.Rmd                   # photos to be used in the 'Photos' tab (NOT WORKING YET)
+|      └── Final_deploy_voltages.Rmd            # stylesheet for customzing dashboard
+|      └── Final_standardize_data.Rmd           # created when `fresh_theme.R` is run (NOT WORKING/USED YET)
 |
-├── media/                    # folder containing media files for project repo
+├── media/                                      # folder containing media files for project repo
 |
-├── draft_files/                    # folder containing all draft project files related to initial testing and development
+├── draft_files/                                # folder containing all draft project files related to initial testing and development
 |
 ├── README.md
 ├── .gitignore        
