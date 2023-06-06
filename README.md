@@ -25,6 +25,8 @@ This repository is maintained by Hofmann Lab graduate student Amelia Ritger (Git
 |      └── Final_deploy_voltages.Rmd                      # stylesheet for customzing dashboard
 |      └── Final_standardize_data.Rmd                 # created when `fresh_theme.R` is run (NOT WORKING/USED YET)
 |
+├── media/                    # folder containing media files for project repo
+|
 ├── draft_files/                    # folder containing all draft project files related to initial testing and development
 |
 ├── README.md
@@ -32,4 +34,4 @@ This repository is maintained by Hofmann Lab graduate student Amelia Ritger (Git
 └── ph-sensor-dev.Rproj
 ```
 
-# DOCUMENTATION TO COME, STAY TUNED!
+### DOCUMENTATION TO COME, STAY TUNED!
