@@ -4,7 +4,7 @@
 #define FILE_NAME "filename.csv" //KEEP THIS AT OR UNDER 8 CHARACTERS, not including '.csv' extension
 
 constexpr time_t ALARM_INTERVAL {600};   // alarm interval (in seconds)
-constexpr time_t START_DAY {12};   // set the day of the month start time (1-31)
+constexpr time_t START_DAY {12};   // set the starting day of the month (1-31)
 constexpr time_t START_HOUR {0};   // set the hours start time (0-23)
 constexpr time_t START_MIN {0};   // set the minutes start time (0-59)
 
