@@ -1,0 +1,32 @@
+---
+title: "Untitled"
+author: "Amelia Ritger"
+date: "2023-04-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+fit difference in temperature at each point 
+
+
+
+the standard deviation of the temperature in the ICE bath and the 25C bath is what you want to calculate
+
+subtract HOBO temp from Durafet temp, get standard deviation of that. do it for each temperature. 
+are there significant differences between each temp.
+
+that's my temperature uncertainty.
+
+Take all my raw data and get the list of file names
+```{r}
+
+```
+
+How much can temp change if R1 is at top of the range
+```{r}
+
+```
+
