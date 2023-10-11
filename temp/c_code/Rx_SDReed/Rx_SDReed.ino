@@ -16,7 +16,7 @@ const byte radioAddress[5] = {'R', 'x', 'A', 'A', 'A'};
 RF24 radio(CE_PIN, CSN_PIN);
 
 // Initialize variables
-int dataReceived; // this must match dataToSend in Tx SHOULD THIS BE UNSIGNED OR 16T?????
+unsigned int dataReceived; // this must match dataToSend in Tx
 byte ackData[32] = {0}; // the values to be sent to the master; 32 bytes max for NRF24L01
 int ledState;
 int reedState;
@@ -62,7 +62,7 @@ void setup() {
   radio.begin();
   //radio.setDataRate(RF24_250KBPS);
   //radio.setPALevel(RF24_PA_LOW); // or MIN
-  radio.enableAckPayload(); // DO I NEED TO HAVE THIS, YEAH?
+  radio.enableAckPayload(); // DO I NEED TO INIT THIS HERE, YEAH?
   ///radio.openReadingPipe(1, radioAddress);
   loadFileData(); // pre-load Ack Payload
   radio.powerDown(); // immediately power down the radio until reed switch trigger
@@ -143,7 +143,13 @@ void showData() {
     Serial.print("ackPayload sent: ");
     Serial.println(F(ackData));
     newData = false;
+    blinkWithoutDelay(); // blink at the interval dictated by dataReceived
   }
+}
+
+//=================
+
+void blinkWithoutDelay() {
   unsigned long currentMillisRadio = millis();
   if (currentMillisRadio - previousMillisRadio >= dataReceived) {
     previousMillisRadio = currentMillisRadio; // update previousMillis value
