@@ -13,7 +13,7 @@ const byte radioAddress[5] = {'R', 'x', 'A', 'A', 'A'};
 RF24 radio(CE_PIN, CSN_PIN); // Create a Radio
 
 // Initialize variables
-unsigned int dataToSend = 1000; // send initial data value to transmit; must match dataReceived in Rx
+unsigned long dataToSend = 1000; // send initial value to transmit; type must match dataReceived in Rx
 String serialInput;
 byte ackData[32]; // to hold the values coming from Rx; 32 bytes max for NRF24L01
 bool newData = false; // to indicate if there is new data from Rx
@@ -35,13 +35,14 @@ void setup() {
 
   Serial.println("Radio Starting...");
   radio.begin();
-  radio.setDataRate( RF24_250KBPS );
-  //radio.setPALevel(RF24_PA_LOW);
+  radio.setDataRate(RF24_250KBPS); // slower data rate = higher resistance to noise
+  //radio.setPALevel(RF24_PA_LOW); // LOW prevents power supply related problems (RF24_PA_MAX is default)
+  radio.setCRCLength(RF24_CRC_16); // set CRC length to 16-bit to ensure data quality
   radio.enableAckPayload();
   radio.setRetries(5, 5); // delay, count
   radio.openWritingPipe(radioAddress);
 
-  Serial.println("Enter a blink interval (in ms):");
+  Serial.println("Enter an interval between 1000 (1 s) and 1800000 (30 min) [in ms]:");
 }
 
 //=============

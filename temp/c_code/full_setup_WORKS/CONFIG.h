@@ -1,7 +1,7 @@
 #ifndef config_h
 #define config_h
 
-#define FILE_NAME "filename.csv" //KEEP THIS AT OR UNDER 8 CHARACTERS, not including '.csv' extension
+#define FILE_NAME "datano.csv" //KEEP THIS AT OR UNDER 8 CHARACTERS, not including '.csv' extension
 
 constexpr time_t ALARM_INTERVAL {10};   // alarm interval (in seconds)
 constexpr time_t START_DAY {12};   // set the starting day of the month (1-31)

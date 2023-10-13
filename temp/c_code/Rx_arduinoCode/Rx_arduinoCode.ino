@@ -7,7 +7,6 @@
 // the slave or the receiver
 
 #include <SPI.h>
-#include <SD.h>
 #include <Wire.h>
 
 #include <Adafruit_ADS1X15.h>
@@ -23,10 +22,14 @@
 #include "SRC.h"
 
 DS3232RTC rtc;            // Construct RTC
+#define DS3231_I2C_ADDRESS 0x68 // Needed when we cut VCC line from RTC, see https://github.com/EKMallon/Utilities/blob/master/setTme/setTme.ino
+#define DS3231_CONTROL_REG 0x0E
+
 SdFat sd;                 // Construct SD card
 File file;                // Construct File for SD card
 Adafruit_ADS1015 ads1015; // Construct Ads1015
 Adafruit_ADS1115 ads1115; // Construct Ads1115
+#define ADS1X15_REG_CONFIG_MODE_SINGLE (0x0100)  // Power down ADCs in single-shot mode
 
 // Define pins
 const uint8_t ledPin = 13; // Adalogger internal LED pin
@@ -34,13 +37,14 @@ const uint8_t chipSelect = 4; // Adalogger microSD card chip select pin
 const uint8_t reedPin = 12; // Reed switch signals on this pin
 const uint8_t cePin = 6; // NRF24L01 CE pin
 const uint8_t csnPin = 10; // NRF24L01 CSN pin
-const uint8_t intPin = 10; // RTC provides an alarm signal on this pin
+const uint8_t intPin = 5; // RTC provides an alarm signal on this pin
 
 // Set up Radio
 const byte radioAddress[5] = {'R', 'x', 'A', 'A', 'A'};
 RF24 radio(cePin, csnPin);
-unsigned int dataReceived; // this must match dataToSend in Tx SHOULD THIS BE UNSIGNED OR 16T?????
+unsigned long dataReceived; // type must match dataToSend in Tx
 byte ackData[32] = {0}; // the SD card file values to be sent to Tx; 32 bytes max for NRF24L01
+const uint16_t dataDivisible = 1000; // minimum divisible value for dataReceived value
 
 // Initialize RTC variables
 char timestamp[32]; // Current time from the RTC in text format, 32 bytes long
@@ -65,12 +69,37 @@ double oversampleSD;
 unsigned long previousMillisRadio = 0;
 unsigned long previousMillisReed = 0;
 unsigned long previousMillisBlink = 0;
-unsigned long blinkInterval = 1000;
-unsigned long transmitInterval = 20000; //interval for power to be supplied to NRF24L01 (in ms)
+unsigned long blinkInterval = 100;
+unsigned long powerInterval = 50000; //interval for power to be supplied to NRF24L01 (in ms)
+
+//=====================
+
+void SDfileDate(uint16_t* date, uint16_t* time) { // print a timestamp ("last modified") callback to the SD card
+  setSyncProvider(rtc.get);
+  *date = FAT_DATE(year(), month(), day());
+  *time = FAT_TIME(hour(), minute(), second());
+}
+
+//=====================
+
+void oversample(Adafruit_ADS1115 * ads1115Pointer, int oversampleArray[OVERSAMPLE_VALUE], int input) { // Function to oversample ADS1115 pins
+  ads1115 = *ads1115Pointer;
+  for (int i = 0; i < OVERSAMPLE_VALUE; i++) {
+    if ((input == 2) || (input == 3)) {
+      int adcValue = ads1115.readADC_SingleEnded(input);
+      oversampleArray[i] = adcValue;
+    } else {
+      int adcValue = ads1115.readADC_Differential_0_1();
+      oversampleArray[i] = adcValue;
+    }
+  }
+}
 
 //======================================================================
 
 void setup() {
+  Wire.begin(); // Start I2C interface
+
   Serial.begin(9600);
   while (!Serial) {
     ; // wait for serial port to connect
@@ -80,7 +109,7 @@ void setup() {
   digitalWrite(ledPin, ledState); // turn off LED
   pinMode(reedPin, INPUT_PULLUP); // initialize pullup resistor on Reed switch pin
   digitalWrite(reedPin, HIGH); // Set Reed switch pin to HIGH
-  dataReceived = 1000;
+  dataReceived = 1000; // Set initial blink interval (to be changed by Tx)
 
   // Setup SD card
   SPI.begin();
@@ -107,6 +136,8 @@ void setup() {
 
   // Initialize the alarms, clear the alarm flags, clear the alarm interrupt flags
   rtc.begin();
+  clearClockTrigger();
+  enableRTCAlarmsonBackupBattery();
   rtc.setAlarm(DS3232RTC::ALM1_MATCH_DATE, 0, 0, 0, 1);
   rtc.setAlarm(DS3232RTC::ALM2_MATCH_DATE, 0, 0, 0, 1);
   rtc.alarm(DS3232RTC::ALARM_1);
@@ -143,11 +174,12 @@ void setup() {
 
   //Setup Radio
   radio.begin();
-  radio.enableAckPayload(); // DO I NEED TO HAVE THIS, YEAH?
+  //radio.enableAckPayload(); // DO I NEED TO HAVE THIS, YEAH?
   loadFileData(); // pre-load Ack Payload
+  Serial << "Powering down radio" << endl;
   radio.powerDown(); // immediately power down the radio until reed switch trigger
 
-  LowPower.sleep(); // go to sleep until Alarm is triggered. This will break Serial communications, but the loop will still be running.
+  //LowPower.sleep(); // go to sleep until Alarm is triggered. This will break Serial communications, but the loop will still be running.
 }
 
 //================
@@ -164,13 +196,15 @@ void loop() {
     if (Serial) {
       Serial << "starting data collection..." << endl;
     }
-    collectData();
+    if (!radioPowerState) { // only collect new data if NRF24L01 is powered down
+      collectData();
+    }
   }
 }
 
 //======================================================================
 
-void blinkWithoutDelay(); {
+void blinkWithoutDelay() {
   unsigned long currentMillisBlink = millis();
   if (currentMillisBlink - previousMillisBlink >= blinkInterval) {
     previousMillisBlink = currentMillisBlink; // update previousMillis value
@@ -196,6 +230,7 @@ void collectData() {
   }
 
   if (alarmTrigger && rtc.alarm(DS3232RTC::ALARM_1)) { // check alarm flag (and clear the flag if set)
+    blinkWithoutDelay(); // Blink LED to indicate data is being collected
     time_t t = rtc.get(); // get the current time
     formatTime(timestamp, t);
     time_t alarmTime = t + ALARM_INTERVAL; // calculate the next alarm time
@@ -223,14 +258,14 @@ void collectData() {
         Serial << "error writing to file" << endl; // if the file didn't open, print an error:
       }
     }
-    blinkWithoutDelay();     // Blink LED to indicate data is collected and SD card is closed
+    digitalWrite(ledPin, LOW); // turn off LED
   }
   if (Serial) { // end the Serial connection if port is available
     Serial << "Going to sleep..." << endl;
-    Serial.flush();
+    //Serial.flush();
     Serial.end();
   }
-  LowPower.sleep(); // go to sleep until next Alarm is triggered. This will break Serial communications, but the loop will still be running.
+  //LowPower.sleep(); // go to sleep until next Alarm is triggered. This will break Serial communications, but the loop will still be running.
 }
 
 //======================================================================
@@ -244,7 +279,15 @@ void extInterrupt(int intPin) {
 
 void getData() {
   if (radio.available()) {
+    unsigned long previousDataReceived = dataReceived; // save previous dataReceived value
     radio.read(&dataReceived, sizeof(dataReceived));
+    if (abs(dataReceived - previousDataReceived) < (previousDataReceived * 0.1)) { // if the difference between old dataReceived value and new dataReceived value is greater than 10%, overwrite dataReceived
+      if (dataReceived % dataDivisible != 0) { // if dataReceived is not a multiple of 1000
+        dataReceived = ((previousDataReceived + dataDivisible - 1) / dataDivisible * dataDivisible); // make it a multiple of 1000
+      } else { // if it is a multiple of 1000 already
+        dataReceived = previousDataReceived;
+      }
+    }
     loadFileData();
     newData = true;
   }
@@ -272,7 +315,6 @@ void loadFileData() {
           ackData[i] = 0; //replace ackData with 0s
         }
       }
-
     } else {
       if (Serial) {
         Serial << "no new data to report!" << endl;
@@ -288,8 +330,13 @@ void radioTriggered() {
   getData();
   showData();
   unsigned long currentMillisReed = millis(); // get the current time
-  if (currentMillisReed - previousMillisReed > transmitInterval) { // if the radio has been powered on and transmitting for longer than the transmit interval
-    digitalWrite(ledPin , LOW); // turn off the LED
+  if (currentMillisReed - previousMillisReed >= powerInterval) { // if the radio has been powered on and transmitting for longer than the interval
+    previousMillisReed = currentMillisReed; // update previousMillisValue
+    //digitalWrite(ledPin , LOW); // turn off the LED
+    file.close(); // make sure file is closed (prevent bricking card)
+    while (sd.card() -> isBusy()) {
+      ;
+    }
     triggerState = false;
     radioPowerState = false;
     radio.powerDown();  // powerDown the radio
@@ -367,6 +414,7 @@ void setupRadio() {
   radio.begin();
   radio.setDataRate(RF24_250KBPS);
   //radio.setPALevel(RF24_PA_LOW); // prevent power supply related problems (RF24_PA_MAX is default)
+  radio.setCRCLength(RF24_CRC_16); // set CRC length to 16-bit to ensure data quality
   radio.enableAckPayload();
   radio.openReadingPipe(1, radioAddress);
   radio.startListening();
@@ -378,8 +426,7 @@ void showData() {
   if (newData == true) {
     if (Serial) {
       Serial << "Data received: " <<  dataReceived << endl;
-      Serial << "ackPayload sent: " << endl;
-      Serial.println(F(ackData)); // HOW DO I FORMAT THIS WITH <<????
+      Serial << "ackPayload sent: " << F(ackData) << endl;
     }
     newData = false;
   }
@@ -402,23 +449,28 @@ void wakeUp() { // Alarm has been triggered
 
 //======================================================================
 
-void SDfileDate(uint16_t* date, uint16_t* time) { // print a timestamp ("last modified") callback to the SD card
-  setSyncProvider(rtc.get);
-  *date = FAT_DATE(year(), month(), day());
-  *time = FAT_TIME(hour(), minute(), second());
+
+void clearClockTrigger() {  // from http://forum.arduino.cc/index.php?topic=109062.0
+  Wire.beginTransmission(DS3231_I2C_ADDRESS);   //Tell devices on the bus we are talking to the DS3231
+  Wire.write(0x0F);               //Tell the device which address we want to read or write
+  Wire.endTransmission();         //Before you can write to and clear the alarm flag you have to read the flag first!
+  Wire.requestFrom(DS3231_I2C_ADDRESS, 1);      //Read one byte
+  Wire.read();
+  Wire.beginTransmission(DS3231_I2C_ADDRESS);   //Tell devices on the bus we are talking to the DS3231
+  Wire.write(0x0F);               //Status Register: Bit 3: zero disables 32kHz, Bit 7: zero enables the main oscilator
+  Wire.write(0b00000000);         //Bit1: zero clears Alarm 2 Flag (A2F), Bit 0: zero clears Alarm 1 Flag (A1F)
+  Wire.endTransmission();
 }
 
-//======================================================================
-
-void oversample(Adafruit_ADS1115 * ads1115Pointer, int oversampleArray[OVERSAMPLE_VALUE], int input) { // Function to oversample ADS1115 pins
-  ads1115 = *ads1115Pointer;
-  for (int i = 0; i < OVERSAMPLE_VALUE; i++) {
-    if ((input == 2) || (input == 3)) {
-      int adcValue = ads1115.readADC_SingleEnded(input);
-      oversampleArray[i] = adcValue;
-    } else {
-      int adcValue = ads1115.readADC_Differential_0_1();
-      oversampleArray[i] = adcValue;
-    }
-  }
+void enableRTCAlarmsonBackupBattery() {
+  Wire.beginTransmission(DS3231_I2C_ADDRESS);      // Attention device at RTC address 0x68
+  Wire.write(DS3231_CONTROL_REG);                  // move the memory pointer to CONTROL_REGister
+  Wire.endTransmission();                          // complete the ‘move memory pointer’ transaction
+  Wire.requestFrom(DS3231_I2C_ADDRESS, 1);         // request data from register
+  byte resisterData = Wire.read();                 // byte from registerAddress
+  bitSet(resisterData, 1);                         // Change bit 1 to a 6 to disable
+  Wire.beginTransmission(DS3231_I2C_ADDRESS);      // Attention device at RTC address 0x68
+  Wire.write(DS3231_CONTROL_REG);                  // target the CONTROL_REGister
+  Wire.write(resisterData);                        // put changed byte back into CONTROL_REG
+  Wire.endTransmission();
 }

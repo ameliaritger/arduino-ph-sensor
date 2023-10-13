@@ -16,9 +16,10 @@ const byte radioAddress[5] = {'R', 'x', 'A', 'A', 'A'};
 RF24 radio(CE_PIN, CSN_PIN);
 
 // Initialize variables
-unsigned int dataReceived; // this must match dataToSend in Tx
+unsigned long dataReceived; // type must match dataToSend in Tx
 byte ackData[32] = {0}; // the values to be sent to the master; 32 bytes max for NRF24L01
-int ledState;
+const uint16_t dataDivisible = 1000; // minimum divisible value for dataReceived value
+int ledState = LOW;
 int reedState;
 bool newData = false;
 bool triggerState = false;
@@ -34,7 +35,7 @@ bool newSdData = true;
 // Initialize millis variables
 unsigned long previousMillisRadio = 0;
 unsigned long previousMillisReed = 0;
-unsigned long transmitInterval = 20000; //interval for power to be supplied to NRF24L01 (in ms)
+unsigned long powerInterval = 50000; //interval for power to be supplied to NRF24L01 (in ms) after Reed switch triggered
 
 //==============
 
@@ -46,7 +47,7 @@ void setup() {
   pinMode(LED_PIN, OUTPUT); // Set LED pin to output mode
   pinMode(REED_PIN, INPUT_PULLUP); // Init pullup resistor on Reed pin
   digitalWrite(REED_PIN, HIGH); // Set Reed pin to HIGH
-  dataReceived = 1000;
+  dataReceived = 1000; // Set initial blink interval (to be changed by Tx)
 
   SPI.begin();
   Serial.println("Initializing SD card...");
@@ -58,13 +59,15 @@ void setup() {
     Serial.println("SD card OK");
   }
 
+  Serial.println("Initializing radio");
   // Generate initial ackData
   radio.begin();
   //radio.setDataRate(RF24_250KBPS);
   //radio.setPALevel(RF24_PA_LOW); // or MIN
-  radio.enableAckPayload(); // DO I NEED TO INIT THIS HERE, YEAH?
+  //radio.enableAckPayload(); // DO I NEED TO INIT THIS HERE, YEAH?
   ///radio.openReadingPipe(1, radioAddress);
   loadFileData(); // pre-load Ack Payload
+  Serial.println("Powering down radio");
   radio.powerDown(); // immediately power down the radio until reed switch trigger
   //radio.startListening();
 }
@@ -72,6 +75,7 @@ void setup() {
 //==========
 
 void loop() {
+  //digitalWrite(LED_PIN, LOW); // turn off LED
   reedState = digitalRead(REED_PIN);
   if (reedState == LOW) {
     Serial.println("switch activated!");
@@ -88,20 +92,34 @@ void loop() {
     getData();
     showData();
     unsigned long currentMillisReed = millis(); // get the current time
-    if (currentMillisReed - previousMillisReed > transmitInterval) { // if the radio has been powered on and transmitting for longer than the transmit interval
-      digitalWrite(LED_PIN , LOW); // turn off the LED
+    if (currentMillisReed - previousMillisReed >= powerInterval) { // if the radio has been powered on and transmitting for longer than the interval
+      previousMillisReed = currentMillisReed; // update previousMillisValue
+      //digitalWrite(LED_PIN , LOW); // turn off the LED
+      file.close(); // make sure file is closed (prevent bricking card)
+      while (sd.card() -> isBusy()) {
+        ;
+      }
       triggerState = false;
       radioPowerState = false;
       radio.powerDown();  // powerDown the radio
     }
   }
+  blinkWithoutDelay(); // blink at the interval dictated by dataReceived
 }
 
 //================
 
 void getData() {
   if (radio.available()) {
+    unsigned long previousDataReceived = dataReceived; // save previous dataReceived value
     radio.read(&dataReceived, sizeof(dataReceived));
+    if (abs(dataReceived - previousDataReceived) < (previousDataReceived * 0.1)) { // if the difference between old dataReceived value and new dataReceived value is greater than 10%, overwrite dataReceived
+      if (dataReceived % dataDivisible != 0) { // if dataReceived is not a multiple of 1000
+        dataReceived = ((previousDataReceived + dataDivisible - 1) / dataDivisible * dataDivisible); // make it a multiple of 1000
+      } else { // if it is a multiple of 1000 already
+        dataReceived = previousDataReceived;
+      }
+    }
     loadFileData();
     newData = true;
   }
@@ -143,7 +161,6 @@ void showData() {
     Serial.print("ackPayload sent: ");
     Serial.println(F(ackData));
     newData = false;
-    blinkWithoutDelay(); // blink at the interval dictated by dataReceived
   }
 }
 
@@ -166,8 +183,9 @@ void blinkWithoutDelay() {
 
 void setupRadio() {
   radio.begin();
-  radio.setDataRate(RF24_250KBPS);
-  //radio.setPALevel(RF24_PA_LOW); // prevent power supply related problems (RF24_PA_MAX is default)
+  radio.setDataRate(RF24_250KBPS); // slower data rate = higher resistance to noise
+  //radio.setPALevel(RF24_PA_LOW); // LOW prevents power supply related problems (RF24_PA_MAX is default)
+  radio.setCRCLength(RF24_CRC_16); // set CRC length to 16-bit to ensure data quality
   radio.enableAckPayload();
   radio.openReadingPipe(1, radioAddress);
   radio.startListening();

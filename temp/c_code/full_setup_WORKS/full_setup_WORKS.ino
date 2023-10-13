@@ -23,12 +23,13 @@ SdFat sd;                 // Create the objects to talk to the SD card
 SdFile file;              // Construct File for SD card
 Adafruit_ADS1015 ads1015; // Construct an ads1015
 Adafruit_ADS1115 ads1115; // Construct an ads1115
+#define ADS1X15_REG_CONFIG_MODE_SINGLE (0x0100)  // Power down ADCs in single-shot mode
 
 const int ledPin = LED_BUILTIN;
 int ledState = LOW; // ledState used to set the LED
 char timestamp[32]; // Current time from the RTC in text format, 32 bytes long
 bool alarmTrigger = true; // Create variable set to false for alarm nesting. Set to true if you want immediate start time.
-const uint8_t intPin = 10; // RTC provides an alarm signal on this pin
+const uint8_t intPin = 5; // RTC provides an alarm signal on this pin
 const uint8_t chipSelect = 4; // Adalogger microSD card chip select pin
 
 int16_t adc2_1, adc2_2, adc2_diff, adc1_1, adc1_diff; //adc1_2 for coin batt
@@ -58,14 +59,13 @@ void oversample(Adafruit_ADS1115* ads1115Pointer, int oversampleArray[OVERSAMPLE
   }
 }
 
-
 void setup()
 {
   pinMode(LED_BUILTIN, OUTPUT); // initialize digital pin 13 as an output (blink)
   digitalWrite(LED_BUILTIN, LOW); // turn off LED
 
   Wire.begin(); // Start I2C interface
-  Serial.begin(115200);
+  Serial.begin(9600);
   while (!Serial) {
     ; // wait for serial port to connect. Needed for native USB port only
   }
@@ -146,7 +146,7 @@ void loop()
     }
     collectData ();
   }
-  
+
   if (Serial) { // end Serial connection if port is available
     Serial << "Going to sleep..." << endl;
     Serial.flush();
@@ -214,7 +214,7 @@ void collectData() {
       Serial << "Writing to SD Card..." << endl;
       time_t TIME = rtc.get();
       file << month(TIME) << "/" << day(TIME) << "/" << year(TIME) << "," << hour(TIME) << ":" << minute(TIME) << ":" << second(TIME) << "," ;
-      
+
       file << adc2_diff * ADS1115_GAIN_MULT << "," << oversampleMean_J1 * ADS1115_GAIN_MULT << "," << oversampleMean_J1 << "," << oversampleMin_J1 << "," << oversampleMax_J1 << "," << oversampleSD_J1 << ","; //J1
       file << adc1_1 * ADS1015_GAIN_MULT << ","; //J2
       file << adc1_diff * ADS1015_GAIN_MULT << ","; //J3
