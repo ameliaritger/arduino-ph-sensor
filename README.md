@@ -13,17 +13,17 @@ This repository is maintained by Hofmann Lab graduate student Amelia Ritger (Git
 ├── documentation/                              # folder containing documentation for building the Arduino data logger for the pH sensor project
 │   └── arduinoPHConstructionOperation.docx     # document for building the Arduino data logger
 |
-├── software/                                   # folder containing the shiny dashboard 
-|   └── arduinoCode/                            # markdown files containing text to be used throughout the app
-|      └── CONFIG.h                             # caption for danner boots photo in gear garage
-|      └── SRC.h                                # title and caption for DT dataTable
-|      └── arduinoCode.ino                      # gear garage box title and description
+├── software/                                   # folder containing software relevant to the Arduino data logger
+|   └── arduinoCode/                            # folder containing C++ code to program the Arduino
+|      └── CONFIG.h                             # configuration script, to set filename, sampling interval, and sampling start date & time
+|      └── SRC.h                                # source script, for useful functions
+|      └── arduinoCode.ino                      # main script, to sample from the pH sensor and store the values on the Arduino
 |           
-|   └── rCode/                                  # special directory in shiny for images, stylesheets, etc. 
-|      └── Final_OMEGAS.Rmd                     # photos & logos used throughout app
-|      └── Final_Tris_Cal.Rmd                   # photos to be used in the 'Photos' tab (NOT WORKING YET)
-|      └── Final_deploy_voltages.Rmd            # stylesheet for customzing dashboard
-|      └── Final_standardize_data.Rmd           # created when `fresh_theme.R` is run (NOT WORKING/USED YET)
+|   └── rCode/                                  # folder containing R code to process pH sensor data. Note: currently formatted for project development, not finalized for public application!
+|      └── Final_OMEGAS.Rmd                     # Step 3: Apply calibration constants to deployment data
+|      └── Final_Tris_Cal.Rmd                   # STEP 2: Calculate calibration constants for the sensor
+|      └── Final_deploy_voltages.Rmd            # STEP 4: Plot calibrated sensor data with HOBO logger temperature data
+|      └── Final_standardize_data.Rmd           # STEP 1: Standardize Arduino (new design) and Madgetech (old design) data
 |
 ├── media/                                      # folder containing media files for project repo
 |
@@ -33,5 +33,3 @@ This repository is maintained by Hofmann Lab graduate student Amelia Ritger (Git
 ├── .gitignore        
 └── ph-sensor-dev.Rproj
 ```
-
-### DOCUMENTATION TO COME, STAY TUNED!
