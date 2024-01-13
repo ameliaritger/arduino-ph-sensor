@@ -1,0 +1,8 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "Durafet_Voltage_Divider")(type "KiCad")(uri "${KIPRJMOD}/feather_m0_basic_proto.pretty")(options "")(descr ""))
+  (lib (name "digikey-footprints")(type "KiCad")(uri "/Users/amelia/Downloads/digikey-kicad-library-master/digikey-footprints.pretty")(options "")(descr ""))
+  (lib (name "digikey_source_Footprints")(type "KiCad")(uri "/Users/amelia/Downloads/digikey-kicad-library-master/src/Source_Footprints")(options "")(descr ""))
+  (lib (name "DS3231_amelia")(type "KiCad")(uri "${KIPRJMOD}/feather_m0_basic_proto.pretty/DS3231_amelia.pretty")(options "")(descr ""))
+  (lib (name "Library")(type "KiCad")(uri "${KIPRJMOD}/Library.pretty")(options "")(descr "")(disabled))
+)
