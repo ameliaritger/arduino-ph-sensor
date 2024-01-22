@@ -408,7 +408,7 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "ph-sensor.kicad_pro",
+    "filename": "ph-sensor_jelly.kicad_pro",
     "version": 1
   },
   "net_settings": {
@@ -442,7 +442,7 @@
     "last_paths": {
       "gencad": "",
       "idf": "",
-      "netlist": "ph-sensor.net",
+      "netlist": "ph-sensor_new.net",
       "specctra_dsn": "",
       "step": "",
       "vrml": ""
