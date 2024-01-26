@@ -18,16 +18,16 @@ library(here)
 library(lubridate)
 
 filename <- "0125tris_clean" #filename for tris data
+row_remove <- 15 # number of rows to remove from beginning of data frame
 ```
 
-## Run "Ideal" calibration for Green DuraFET tris
+## Run "Ideal" calibration for DuraFET
 ```{r}
 var_ard <- 0 #calculated uncertainties using raw data
 
 ard_correction_m <- 1 #slope coefficient for arduino (corrected with HOBO)
 ard_correction_b <- 0
 
-#Run the code
 trisdata <- read_csv(here("temp", "data", "jan2024", paste(filename,".csv",sep=""))) %>%
   mutate(date = mdy(date),
            time = hms(time),
@@ -90,7 +90,7 @@ omegas_ph_tris <- data.frame(trisdata$date_time,omegas_temp_tris$durafet,omegas_
   mutate(phdiff=abs(omegasph-lag(omegasph,n=5,default=first(omegasph)))) # find difference between two pH measurements 5 rows apart to identify where pH stabilizes
 
 calibration_values <- omegas_ph_tris %>% # work in omegas_calibration dataframe
-  filter(row_number()!=c(1:100)) %>% # remove the first 100 rows (first 20 minutes of data)
+  filter(row_number()!=c(1:row_remove)) %>% # remove the first 100 rows (first 20 minutes of data)
   slice_min(tempdiff,n=10) %>% # select the rows that contains the minimum values of change in temperature over time 
   slice_min(phdiff,n=1) %>% # select the row that contains the minimum value of change in pH over time in within the 10 lowest temp differences
   mutate(diff_omegasph = (omegasph - mean(omegasph))) %>%
