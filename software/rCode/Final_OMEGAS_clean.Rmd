@@ -1,0 +1,98 @@
+---
+title: "STEP 3: Apply GREEN and RED calibration data to all readings"
+author: "Amelia Ritger"
+date: "2023-04-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Load libraries, set constants
+```{r}
+library(tidyverse)
+library(readr)
+library(janitor)
+library(here)
+library(lubridate)
+
+filename_calib <- "0125tris_clean_omegas_calib" #filename for tris calibration data
+filename_deploy <- "0123comp_clean" #filename for deployment calibration data
+```
+
+## Run calibration for GREEN data
+```{r}
+calibration_values <- read_csv(here("temp", "data", "jan2024", paste(filename_calib,".csv",sep=""))) %>%
+  rename("durafet_temp" = "omegas_temp_tris.durafet",
+         "v1" = "omegas_temp_tris.v1")
+
+rawdata <- read_csv(here("temp", "data", "jan2024", paste(filename_deploy,".csv",sep=""))) %>%
+    mutate(date = mdy(date),
+           time = hms(time),
+           date_time = paste(date, time),
+           date_time_lubridate=ymd_hms(date_time)) %>%
+  select(date_time_lubridate, v1, v2, v3, v4) %>%
+  rename(date_time = date_time_lubridate)
+
+raw_voltages <- data.frame(rawdata$v1,rawdata$v2,rawdata$v3,rawdata$v4) %>% # create OMEGAS data frame with the raw voltages
+  mutate(mv1=as.numeric(rawdata.v1),
+         mv2=as.numeric(rawdata.v2),
+         mv3=as.numeric(rawdata.v3),
+         mv4=as.numeric(rawdata.v4)) %>% # changing data to numeric arguments
+  select(mv1, mv2, mv3, mv4) # cleaning data frame
+
+omegas_temp_raw <- raw_voltages %>% # create OMEGAS data frame with the raw voltages
+  mutate(v1=(mv1/1000),
+         v2=(mv2/1000),
+         v3=(mv3/1000),
+         v4=(mv4/1000)) %>% # converting the mV to volts
+  mutate(vbattery=((abs(v3)/100)*101.57)) %>% # calculate vbattery
+  mutate(z=(v4/100)+vbattery*((15000*1)/((1000000*1)+(15000*1)))) %>% # calculate column k
+  mutate(y=(z*(1000000*1))) %>% # calculate column l
+  mutate(rthermistor=(y/(vbattery-z))) %>% # calculate Rthermistor
+  mutate(sh_a=as.numeric(0.00106329736674527)) %>% # create column with Steinhart constant A
+  mutate(sh_b=as.numeric(0.000251377462346306)) %>% # create column with Steinhart constant B
+  mutate(sh_c=as.numeric(2.55455247726963E-08)) %>% # create column with Steinhart constant C
+  mutate(k=(1/(sh_a+sh_b*log(rthermistor)+sh_c*(log(rthermistor))^3))) %>% # create column to calculate intermediate value K
+  mutate(durafet=as.numeric((k-273.15))) # create new column to calculate durafet therm
+
+temp <- c(omegas_temp_raw$durafet) # copy durafet therm into tris pH template
+b <- as.numeric(rep("11911.08",length(temp))) # create vector for tris pH template column b
+c <- as.numeric(rep("18.2499",length(temp))) # create vector for tris pH template column c
+d <- as.numeric(rep("0.039336",length(temp))) # create vector for tris pH template column d
+e <- as.numeric(rep("366.27059",length(temp))) # create vector for tris pH template column e
+f <- as.numeric(rep("0.53993607",length(temp))) # create vector for tris pH template column f
+g <- as.numeric(rep("0.00016329",length(temp))) # create vector for tris pH template column g
+h <- as.numeric(rep("64.52243",length(temp))) # create vector for tris pH template column h
+i <- as.numeric(rep("0.084041",length(temp))) # create vector for tris pH template column i
+j <- as.numeric(rep("0.11149858",length(temp))) # create vector for tris pH template column j
+k <- as.numeric(rep("273.15",length(temp))) # create vector for tris pH template column k
+t <- as.numeric(rep(k+temp),length(temp)) # create vector for tris pH template column t
+m <- as.numeric(rep("35",length(temp))) # create vector for tris pH template column m
+
+raw_tris_ph <- data.frame(temp,b,c,d,e,f,g,h,i,j,t,k,m) %>% # create tris pH template as a data frame with all above columns
+  mutate(n=(b-(c*m)-(d*m*m))*1/t) %>% # create column n
+  mutate(o=(-e+(f*m)+(g*m*m))) %>% # create column o
+  mutate(p=(h-(i*m))*log(t)-(j*(t))) %>% # create column p
+  mutate(trisph=(n+o+p)) # calculate tris pH, add as a new column to tris pH template data frame
+
+omegas_ph_raw <- data.frame(rawdata$date_time,omegas_temp_raw$durafet,omegas_temp_raw$v1) %>%
+   # create data frame with durafet therm and voltage 1 values
+  rename(date_time=rawdata.date_time) %>% # rename date/time column from trisdata data frame
+  mutate(trisph=raw_tris_ph$trisph) %>% # add tris pH values into calibration dataframe TRIS PH IS NOT THE SAME LENGTH AS THE RAW DATA
+  mutate(tk=omegas_temp_raw$durafet+273.15) %>% # add TK column to data frame
+  mutate(st=(8.31451*tk/96487*log(10))) %>% # add S(T) column to data frame
+  mutate(eo=((calibration_values$v1)-(calibration_values$trisph)*8.31451*(273.15+calibration_values$durafet_temp)*log(10)/96487)) %>% # calculate eo value using calibration values
+  mutate(eot=(eo-(0.001*(tk-(273.15+calibration_values$durafet_temp))))) %>% # add Eo(T) column to data frame
+  mutate(omegasrawph=(omegas_temp_raw$v1-eot)/st) %>% # add pH column to data frame
+  mutate(diff=(trisph-omegasrawph)) # add difference column (tris pH - omegas pH) to data frame
+
+raw_calibrated <- omegas_ph_raw %>% # create new dataframe using omegasph_raw data
+  select(date_time, omegas_temp_raw.durafet, omegasrawph) %>% # keep only date/time, temperature, and pH columns
+  rename("p_h"=3)
+
+#Write .csv
+write.csv(raw_calibrated, here("temp", "data", "jan2024", paste("FINAL_arduino.csv")),row.names = FALSE) # create csv with calibrated values
+
+```
