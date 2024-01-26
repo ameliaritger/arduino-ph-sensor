@@ -23,15 +23,15 @@ mean_diff_ext <- seafet_calib_diff$mean_diff_ext
 #intercept <- coef(model)[1]
 
 seafet <- read_csv(here("temp", "data", "jan2024", "SeaFET2-0002300-Data-20240125T200951.csv")) %>%
-  select(2, 5, 6) %>%
-  rename(date_time=1, int_ph=3, ext_ph=2) %>%
+  select(2, 5, 6, 9) %>%
+  rename(date_time=1, int_ph=3, ext_ph=2, temp_seafet=4) %>%
   mutate(date_time=mdy_hms(date_time),
          ext_adjust = ext_ph + mean_diff_ext)
 
 arduino <- read_csv(here("temp", "data", "jan2024", "FINAL_arduino.csv")) %>%
-  mutate(date_time=ymd_hms(date_time)) %>%
-  select(date_time, p_h) %>%
-  mutate(date_time = date_time - 1)
+  mutate(date_time=ymd_hms(date_time),
+         date_time = date_time - 1) %>%
+  rename(date_time=1, ph=3, temp_ard=2)
 
 # Merge the arduino and seafet data frames
 all_data <- full_join(arduino, seafet, by="date_time") %>%
@@ -39,12 +39,12 @@ all_data <- full_join(arduino, seafet, by="date_time") %>%
   arrange(date_time) %>%
   filter(date_time > ymd_hms("2024-01-23 18:30:00"),
          date_time < ymd_hms("2024-01-25 11:30:00")) %>%
-  filter(!is.na(p_h),
+  filter(!is.na(ph),
          !is.na(ext_adjust))
 
 # ggplot the data, p_h and p_h_fet over time and shown in two different colors
 ggplot(all_data, aes(x=date_time)) +
-  geom_point(aes(y=p_h, color="Arduino")) +
+  geom_point(aes(y=ph, color="Arduino")) +
   geom_point(aes(y=ext_adjust, color="SeaFET")) +
   #create a colorblind friendly color palette using blue and orange
   scale_color_manual(values=c("#D55E00", "#0072B2")) +
