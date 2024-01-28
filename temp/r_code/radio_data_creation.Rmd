@@ -1,0 +1,60 @@
+---
+title: "Generating fake data to test NRF24L01 transmission"
+author: "Amelia Ritger"
+date: "2024-01-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+```
+
+```{r}
+# Create a 1000 x 7 matrix containing a zeros with two decimal places (so, 0.00)
+df <- data.frame(matrix(0, nrow = 1000, ncol = 7, byrow=TRUE))
+# Assign column names
+colnames(df) <- paste0("Col", 1:7)
+# Write the data frame to a CSV file
+write.csv(df, "zeroes.csv", row.names = FALSE)
+```
+
+```{r}
+# Create a matrix containing a sequence of numbers 
+df <- data.frame(matrix(1:2900, nrow = 2900, ncol = 7, byrow=TRUE))
+# Assign column names
+colnames(df) <- paste0("Col", 1:7)
+# Write the data frame to a CSV file using here package
+
+write.csv(df, here("temp", "data", "jan2024", "sequence.csv"), row.names = FALSE)
+```
+
+```{r}
+# Import serial.txt from the parent directory
+file_contents <- readLines("all_dat.txt" )
+
+# Specify the file path and string to search for
+search_string <- "Data received" #"Acknowledge data received" "Data transfer failed"
+
+# Count the occurrences of the string
+occurrences <- sum(grepl(search_string, file_contents))
+
+# 1049 vs 9
+# 1091 VS 5
+# 1117 VS 10
+# 9314 VS 34
+# 6258 VS 41
+# 3013 VS 12
+100-((1091/(1091+5))*100)
+100-((1117/(1117+10))*100)
+100-((1049/(1049+9))*100) #1 month of data, serial3
+
+100-((9314/(9314+34))*100) #3 months of data, serial4
+100-((6258/(6258+41))*100) #2 months of data, serial5
+100-((3013/(3013+12))*100) #1 month of data, serial6
+
+# Extract first two lines and last two lines from file_contents
+first_lines <- head(file_contents, 2)
+last_lines <- tail(file_contents, 2)
+```
+
