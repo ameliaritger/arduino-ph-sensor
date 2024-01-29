@@ -1,0 +1,274 @@
+---
+title: "Data vis current consumption Version 2"
+author: "Amelia Ritger"
+date: "2023-10-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(janitor)
+library(here)
+```
+
+Plot when adalogger is wirelessly communicating (reed switch triggered 3x) - 1) receiving data, 2) sending data, and 3) receiving data 
+```{r}
+receive_all <- read_csv(here("temp", "data", "power", "VoltageSet3_60V_at2023_10_14_12_19_57.csv")) %>%
+  clean_names() %>%
+  mutate(current_ma = current_a*10) %>%
+  select(1:3, current_ma)
+
+ggplot(receive_all, aes(x=times_s, y=current_ma)) +
+  geom_line()
+```
+
+Plot "Run 1" - when Adalogger is receiving interval data
+```{r}
+receive_int <- read_csv(here("temp", "data", "power", "VoltageSet3_60V_at2023_10_14_12_25_20.csv")) %>%
+  clean_names() %>%
+  mutate(current_ma = current_a*10) %>%
+  select(1:3, current_ma)
+
+ggplot(receive_int, aes(x=times_s, y=current_ma)) +
+  geom_line() +
+  scale_y_continuous(limits = c(0.1,0.4),
+                    breaks = seq(0, 100, by = 0.05))
+```
+
+Plot "Run 2" - when Adalogger is sending "no new data to report"
+```{r}
+send_no_new <- read_csv(here("temp", "data", "power", "VoltageSet3_60V_at2023_10_14_12_27_18.csv")) %>%
+  clean_names() %>%
+  mutate(current_ma = current_a*1000) %>%
+  select(1:3, current_ma) %>%
+  filter(times_s < 55) %>%
+  mutate(times_s = times_s - 10) %>%
+  filter(times_s>0)
+
+receive_avg <- send_no_new %>%
+  filter(times_s > 20,
+         times_s < 49) %>%
+  summarize(mean = mean(current_ma))  
+
+annotation <- data.frame(
+   x = c(25.56629),
+   y = c(40),
+   label = c("37.5 mA")
+)
+
+ggplot(send_no_new, aes(x=times_s, y=current_ma)) +
+  annotate(geom = "point", x = 35.56629-10, y = 37.55524, colour = "#0072B2", size = 3) +
+  geom_line() + 
+  geom_text(data=annotation, aes( x=x, y=y, label=label), color="black", size=5, fontface="bold", hjust=-0.15) +
+  labs(x="Time (s)", y="Current (mA)") +
+  scale_y_continuous(limits = c(10,40),
+                    breaks = seq(0, 100, by = 5)) +
+  theme_bw() +
+  theme(text = element_text(size=20))
+
+#ggsave(here("temp", "figures", "OCEANS", "receive_data.png"), height=10, width=15, units="cm")
+```
+
+Plot "Run 3" - when Adalogger is sending  SD card data
+```{r}
+send_sd_a <- read_csv(here("temp", "data", "power", "VoltageSet3_60V_at2023_10_14_12_31_23.csv")) %>%
+  clean_names() %>%
+  mutate(current_ma = current_a*10) %>%
+  select(1:3, current_ma)
+
+ggplot(send_sd_a, aes(x=times_s, y=current_ma)) +
+  geom_line() +
+    scale_y_continuous(limits = c(0.1,0.4),
+                     breaks = seq(0, 100, by = 0.02)) 
+```
+
+
+Plot "Run 4" - another ex of when Adalogger is sending SD card data
+```{r}
+send_sd_b <- read_csv(here("temp", "data", "power", "VoltageSet3_60V_at2023_10_14_12_34_55.csv")) %>%
+  clean_names() %>%
+  mutate(current_ma = current_a*1000) %>%
+  select(1:3, current_ma) %>%
+  filter(times_s<40)
+
+send_avg <- send_sd_b %>%
+  filter(times_s > 10,
+         times_s < 19) %>%
+  summarize(mean = mean(current_ma))  
+
+annotation <- data.frame(
+   x = c(31.83300, 10),
+   y = c(40, 39),
+   label = c("38.8 mA", "32.1 mA")
+)
+
+ggplot(send_sd_b, aes(x=times_s, y=current_ma)) +
+  annotate(geom = "point", x = 31.83300, y = 38.80183, colour = "#0072B2", size = 3) +
+  annotate(geom = "point", x = 11.6510231, y = 32.11241, colour = "#0072B2", size = 3) +
+  geom_line() + 
+  geom_text(data=annotation, aes( x=x, y=y, label=label), color="black", size=5, fontface="bold", hjust=-0.15) +
+  labs(x="Time (s)", y="Current (mA)") +
+  scale_y_continuous(limits = c(10,40),
+                    breaks = seq(0, 100, by = 5)) +
+  theme_bw() +
+  theme(text = element_text(size=20))
+
+#ggsave(here("temp", "figures", "OCEANS", "send_sd.png"), height=10, width=15, units="cm")
+```
+
+Plot when Adalogger is sampling and then sleeping
+```{r}
+sample_sleep_a <- read_csv(here("temp", "data", "power", "VoltageSet3_60V_at2023_10_14_14_30_00.csv")) %>%
+  clean_names() %>%
+  mutate(current_ma = current_a*1000) %>%
+  select(1:3, current_ma) %>%
+  filter(times_s>8) %>%
+  mutate(times_s = times_s - 8) %>%
+  filter(times_s<25)
+
+sleep <- sample_sleep_a %>%
+  filter(times_s > 5.5,
+         times_s < 18.5) %>%
+  summarize(mean = mean(current_ma))
+
+sample <- sample_sleep_a %>%
+  filter(times_s > 3.5,
+         times_s < 5.3) %>%
+  summarize(mean = mean(current_ma))
+
+annotation <- data.frame(
+   x = c(5.5,20.5, 9.95),
+   y = c(0.156*100,0.135*100, 0.027*100),
+   label = c("15.5 mA", "13.2 mA", "1.8 mA")
+)
+
+ggplot(sample_sleep_a, aes(x=times_s, y=current_ma)) +
+  annotate(geom = "point", x = 5.4593306, y = 0.15447820*100, colour = "#0072B2", size = 3) +
+  annotate(geom = "point", x = 19.884166, y = 0.13227690*100, colour = "#0072B2", size = 3) +
+  annotate(geom = "point", x = 9.9521229, y = 0.01827854*100, colour = "#0072B2", size = 3) +
+  geom_line() + 
+  geom_text(data=annotation, aes( x=x, y=y, label=label), color="black", size=5, fontface="bold", hjust=-0.15) +
+  labs(x="Time (s)", y="Current (mA)") +
+  scale_y_continuous(limits = c(0,16),
+                     breaks = seq(0, 100, by = 4)) +
+  theme_bw() +
+  theme(text = element_text(size=20))
+
+#ggsave(here("temp", "figures", "OCEANS", "sample-sleep.png"), height=10, width=15, units="cm")
+```
+
+Plot another example of when Adalogger is sampling and then sleeping
+```{r}
+sample_sleep_b <- read_csv(here("temp", "data", "power", "VoltageSet3_60V_at2023_10_14_14_54_39.csv")) %>%
+  clean_names() %>%
+  mutate(current_ma = current_a*10) %>%
+  select(1:3, current_ma) %>%
+  filter(times_s<20)
+
+annotation <- data.frame(
+   x = c(14.5,4.5),
+   y = c(0.16,0.15),
+   label = c("0.155 mA", "0.147 mA")
+)
+
+ggplot(sample_sleep_b, aes(x=times_s, y=current_ma)) +
+  annotate(geom = "point", x = 14.3918459, y = 0.15507400, colour = "#56B4E9", size = 3) +
+  annotate(geom = "point", x = 4.4597836, y = 0.14704890, colour = "#56B4E9", size = 3) +
+  annotate(geom = "point", x = 7.0232589, y = 0.02732002, colour = "#56B4E9", size = 3) +
+  geom_line() + 
+  geom_text(data=annotation, aes( x=x, y=y, label=label), color="black", size=5, fontface="bold", hjust=-0.2) +
+  labs(x="Time (s)", y="Current (mA)") +
+  theme_bw() +
+  theme(text = element_text(size=20))
+```
+
+Merge all the plots into one!
+```{r}
+send_sd_b <- send_sd_b %>%
+  filter(times_s < 34.739158)
+
+send_no_new <- send_no_new %>%
+  filter(times_s > 2.37331581)
+
+all_list <- rbind(sample_sleep_a, send_sd_b, send_no_new) %>%
+  mutate(time_diff = abs(times_s - lag(times_s, default = first(times_s))),
+         time_diff = ifelse(time_diff > 1, 0.171, time_diff),
+         time_adjust = accumulate(time_diff[-1], sum, .init = times_s[1])) %>%
+  # if current_ma is less than 2, subtract 0.5697
+  mutate(current_ma = ifelse(current_ma < 2, current_ma - 0.5697, current_ma)) %>%
+ # if current_ma is greater than 10 and less than 15, and times_s is less than 25, subtract 0.5
+  mutate(current_ma = ifelse(current_ma > 10 & current_ma < 15 & time_adjust < 25, current_ma - 0.606, current_ma))
+  
+annotation <- data.frame(
+   x = c(15, 7, 89,56.69334, 30),
+   y = c(17, 5, 39.5, 40, 25),
+   label = c("12.8 mA", "1.3 mA", "37.5 mA", "38.8 mA", "32.1 mA")
+)
+
+ggplot(all_list, aes(x=time_adjust, y=current_ma)) +
+  annotate("rect", xmin = 2, xmax = 23, ymin = 0, ymax = 40, alpha = .1,fill = "black") +
+  annotate("rect", xmin = 27, xmax = 63, ymin = 0, ymax = 40, alpha = .1,fill = "black") +
+  annotate("rect", xmin = 65, xmax = 100, ymin = 0, ymax = 40, alpha = .1,fill = "black") +
+  annotate("label", x = 12.5, y = 35, label = "A", fontface="bold", size = 7) +
+  annotate("label", x = 45, y = 5, label = "B", fontface="bold", size = 7) +
+  annotate("label", x = 82, y = 5, label = "C", fontface="bold", size = 7) +
+  annotate(geom = "point", x = 56.69334, y = 38.80183, colour = "#0072B2", size = 3) +
+  annotate(geom = "point", x = 36.51136, y = 32.11241, colour = "#0072B2", size = 3) +
+  annotate(geom = "point", x = 82.96347, y = 37.55524, colour = "#0072B2", size = 3) +
+  #annotate(geom = "point", x = 5.459331, y = 15.447820, colour = "#0072B2", size = 3) +
+  annotate(geom = "point", x = 19.719877, y = 12.760250, colour = "#0072B2", size = 3) +
+  annotate(geom = "point", x = 9.952123, y = 1.258154, colour = "#0072B2", size = 3) +
+  geom_line() + 
+  geom_text(data=annotation, aes( x=x, y=y, label=label), color="black", size=5, fontface="bold", hjust=-0.15) +
+  labs(x="Time (s)", y="Current (mA)") +
+  scale_y_continuous(limits = c(0,40),
+                    breaks = seq(0, 100, by = 5)) +
+  theme_bw() +
+  theme(text = element_text(size=20))
+
+ggsave(here("temp", "figures", "OCEANS", "power_jan28.png"), height=10, width=30, units="cm")
+```
+
+```{r}
+sample_jan <- read_csv(here("temp", "data", "power", "VoltageSet3_6V_at2024_01_28_13_52_14.csv")) %>%
+  clean_names() %>%
+  mutate(current_ma = current_positive_a*1000) %>%
+  select(1:2, current_ma)
+
+ggplot(sample_jan, aes(x=times_s, y=current_ma)) +
+  #annotate(geom = "point", x = 14.3918459, y = 0.15507400, colour = "#56B4E9", size = 3) +
+  #annotate(geom = "point", x = 4.4597836, y = 0.14704890, colour = "#56B4E9", size = 3) +
+  #annotate(geom = "point", x = 7.0232589, y = 0.02732002, colour = "#56B4E9", size = 3) +
+  geom_line() + 
+  #geom_text(data=annotation, aes( x=x, y=y, label=label), color="black", size=5, fontface="bold", hjust=-0.2) +
+  labs(x="Time (s)", y="Current (mA)") +
+  theme_bw() +
+  theme(text = element_text(size=20))
+
+sample_sleep <- sample_jan %>%
+  mutate(state = ifelse(current_ma < 1.4, "sleep", 
+                        ifelse(current_ma > 22, "radio", 
+                               ifelse(current_ma> 10 & current_ma < 13, "sample", "other"))),
+         state = ifelse(times_s > 125 & times_s < 127, "other", 
+                        ifelse(times_s > 152 & times_s < 154, "other", 
+                               ifelse(times_s > 182 & times_s < 185, "other", state)))) %>%
+  filter(times_s>50) %>% 
+  #remove last 2 data points
+  slice(1:(n()-2))
+  # if times_s is 125 - 127, 152-154, or 182-185 then label as "other" state
+
+sample_sleep_group <- sample_sleep %>%
+  group_by(state) %>%
+  summarize(mean_current = mean(current_ma)) %>%
+  ungroup() # 1.26 mA = sleep
+
+ggplot(sample_sleep, aes(x=times_s, y=current_ma)) +
+  #geom_line() + # color by sleep
+  geom_point(aes(color = state)) +
+  geom_line() +
+  labs(x="Time (s)", y="Current (mA)") +
+  theme_bw() +
+  theme(text = element_text(size=20))
+```
+
