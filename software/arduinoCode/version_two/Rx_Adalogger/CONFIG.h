@@ -1,21 +1,21 @@
 #ifndef config_h
 #define config_h
 
-#define FILE_NAME "newfile.csv" //KEEP THIS AT OR UNDER 8 CHARACTERS, not including '.csv' extension
+#define FILE_NAME "0128.csv" //KEEP THIS AT OR UNDER 8 CHARACTERS, not including '.csv' extension
 
-constexpr time_t ALARM_INTERVAL {10};   // alarm interval (in seconds)
-constexpr time_t START_DAY {12};   // set the starting day of the month (1-31)
-constexpr time_t START_HOUR {0};   // set the hours start time (0-23)
-constexpr time_t START_MIN {0};   // set the minutes start time (0-59)
+constexpr time_t ALARM_INTERVAL {20};   // alarm interval (in seconds)
+constexpr time_t START_DAY {28};   // set the starting day of the month (1-31)
+constexpr time_t START_HOUR {13};   // set the hours start time (0-23)
+constexpr time_t START_MIN {49};   // set the minutes start time (0-59)
 
 #define OVERSAMPLE_VALUE 64 // set oversampling value. DO NOT CHANGE, DEFAULT: 64. Options: 16, 64, and 256
 #define FUDGE_VALUE 17 // set fudge factor value. This adjusts the timestamp printed on the SD card if it is different from your computer device time. Compare the timestamps printed on the Serial and adjust accordingly (value typically between 1 and 20 seconds).  
 
 // Set ADC gain values. DO NOT CHANGE, see table below for reference.
-#define ADS1015_GAIN_VAL GAIN_FOUR   // Recommended: GAIN_EIGHT
-#define ADS1015_GAIN_MULT 0.5             // Change this number based on gain selected.
-#define ADS1115_GAIN_VAL GAIN_FOUR  // Recommended: GAIN_FOUR
-#define ADS1115_GAIN_MULT 0.03125          // Change this number based on gain selected.
+#define ADS1015_GAIN_VAL GAIN_ONE   // Recommended: GAIN_EIGHT
+#define ADS1015_GAIN_MULT 2             // Change this number based on gain selected.
+#define ADS1115_GAIN_VAL GAIN_ONE  // Recommended: GAIN_FOUR
+#define ADS1115_GAIN_MULT 0.125          // Change this number based on gain selected.
 
 //                                                                ADS1015  ADS1115
 //                                                                -------  -------

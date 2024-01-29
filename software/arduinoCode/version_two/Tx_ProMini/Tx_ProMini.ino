@@ -36,7 +36,7 @@ void setup() {
   Serial.println("MasterSwapRoles Starting");
 
   radio.begin();
-  radio.setDataRate( RF24_250KBPS );
+  radio.setDataRate(RF24_250KBPS);
   radio.setPALevel(RF24_PA_LOW);
   radio.setCRCLength(RF24_CRC_16); // set CRC length to 16-bit to ensure data quality
   radio.openWritingPipe(rxAddress);
