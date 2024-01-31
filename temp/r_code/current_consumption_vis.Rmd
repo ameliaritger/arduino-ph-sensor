@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(janitor)
 library(here)
+library(ggstar)
 ```
 
 Plot when adalogger is wirelessly communicating (reed switch triggered 3x) - 1) receiving data, 2) sending data, and 3) receiving data 
@@ -206,7 +207,16 @@ annotation <- data.frame(
    label = c("12.8 mA", "1.3 mA", "37.5 mA", "38.8 mA", "32.1 mA")
 )
 
-ggplot(all_list, aes(x=time_adjust, y=current_ma)) +
+#overwrite in-between periods with 1.26 mA sleep current 
+all_list_adjust <- all_list %>%
+  mutate(current_ma = ifelse(time_adjust > 24.03231 & time_adjust < 28.29884, 1.26, current_ma),
+         current_ma = ifelse(time_adjust > 61.70909 & time_adjust < 66.31044, 1.26, current_ma),
+         current_ma = ifelse(time_adjust > 99.10344, 1.26, current_ma))
+
+#import image of lightning bolt
+lightning_icon <- ggimage::image_read2(here("temp", "figures", "fa-bolt.png"))
+
+ggplot(all_list_adjust, aes(x=time_adjust, y=current_ma)) +
   annotate("rect", xmin = 2, xmax = 23, ymin = 0, ymax = 40, alpha = .1,fill = "black") +
   annotate("rect", xmin = 27, xmax = 63, ymin = 0, ymax = 40, alpha = .1,fill = "black") +
   annotate("rect", xmin = 65, xmax = 100, ymin = 0, ymax = 40, alpha = .1,fill = "black") +
@@ -216,7 +226,6 @@ ggplot(all_list, aes(x=time_adjust, y=current_ma)) +
   annotate(geom = "point", x = 56.69334, y = 38.80183, colour = "#0072B2", size = 3) +
   annotate(geom = "point", x = 36.51136, y = 32.11241, colour = "#0072B2", size = 3) +
   annotate(geom = "point", x = 82.96347, y = 37.55524, colour = "#0072B2", size = 3) +
-  #annotate(geom = "point", x = 5.459331, y = 15.447820, colour = "#0072B2", size = 3) +
   annotate(geom = "point", x = 19.719877, y = 12.760250, colour = "#0072B2", size = 3) +
   annotate(geom = "point", x = 9.952123, y = 1.258154, colour = "#0072B2", size = 3) +
   geom_line() + 
@@ -225,7 +234,11 @@ ggplot(all_list, aes(x=time_adjust, y=current_ma)) +
   scale_y_continuous(limits = c(0,40),
                     breaks = seq(0, 100, by = 5)) +
   theme_bw() +
-  theme(text = element_text(size=20))
+  theme(text = element_text(size=20)) +
+  #annotate("text", x = 40, y = 10, label = "Reed switch activated", fontface="bold", size = 5, hjust = 0) +
+  #annotate("segment", x = 38, xend = 29, y = 8, yend = 1.5, arrow = arrow(length = unit(0.5, "cm"))) +
+  geom_star(x=26.8, y=4, starshape=26, angle = -30, fill="#D55E00", size=5, colour = NA) +
+  geom_star(x=64.8, y=4, starshape=26, angle = -30, fill="#D55E00", size=5, colour = NA)
 
 ggsave(here("temp", "figures", "OCEANS", "power_jan28.png"), height=10, width=30, units="cm")
 ```
