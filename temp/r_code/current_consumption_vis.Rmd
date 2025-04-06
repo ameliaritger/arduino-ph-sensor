@@ -214,7 +214,7 @@ all_list_adjust <- all_list %>%
          current_ma = ifelse(time_adjust > 99.10344, 1.26, current_ma))
 
 #import image of lightning bolt
-lightning_icon <- ggimage::image_read2(here("temp", "figures", "fa-bolt.png"))
+#lightning_icon <- ggimage::image_read2(here("temp", "figures", "fa-bolt.png"))
 
 ggplot(all_list_adjust, aes(x=time_adjust, y=current_ma)) +
   annotate("rect", xmin = 2, xmax = 23, ymin = 0, ymax = 40, alpha = .1,fill = "black") +
@@ -240,7 +240,7 @@ ggplot(all_list_adjust, aes(x=time_adjust, y=current_ma)) +
   geom_star(x=26.8, y=4, starshape=26, angle = -30, fill="#D55E00", size=5, colour = NA) +
   geom_star(x=64.8, y=4, starshape=26, angle = -30, fill="#D55E00", size=5, colour = NA)
 
-ggsave(here("temp", "figures", "OCEANS", "power_jan28.png"), height=10, width=30, units="cm")
+#ggsave(here("temp", "figures", "FINAL(diss)", "current.png"), height=10, width=30, units="cm")
 ```
 
 ```{r}
