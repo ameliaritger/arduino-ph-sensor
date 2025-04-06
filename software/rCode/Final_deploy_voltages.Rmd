@@ -19,7 +19,7 @@ library(lubridate)
 library(scales)
 library(ggpmisc)
 
-file_names <- list.files(here("data", "raw", "deploy"), pattern = "CLEAN", recursive = FALSE, full.names = TRUE)
+file_names <- list.files(here("temp", "data", "raw", "deploy"), pattern = "CLEAN", recursive = FALSE, full.names = TRUE)
 
 merged <- read_csv(file_names, col_names = TRUE) %>%
   mutate(date_lubridate=mdy(date)) %>% # tell R "date" is a DATE
@@ -63,18 +63,23 @@ sd1a <- merged_diff$sdT[1]
 sd1m <- merged_diff$sdT[2]
 
 ggplot(merged, aes(x=date_time)) +
-  geom_line(aes(y=v4corr, color=logger),size=1) +
-  #geom_ribbon(aes(ymin = v4 - ifelse(logger=="arduino", sd1a, sd1m), ymax = v4 + ifelse(logger=="arduino", sd1a, sd1m), fill=logger), alpha=0.2, show.legend=FALSE) +
-  scale_color_brewer(palette="Set1", direction=-1, labels = c("New Design", "Old Design")) +
-  scale_fill_brewer(palette="Set1", direction=-1, labels = c("New Design", "Old Design")) +
+  geom_line(aes(y=v4, color=logger),size=1) +
+  geom_ribbon(aes(ymin = v4 - ifelse(logger=="arduino", sd1a, sd1m), ymax = v4 + ifelse(logger=="arduino", sd1a, sd1m), fill=logger), alpha=0.2, show.legend=FALSE) +
+  scale_color_manual(values=c("#D55E00", "#0072B2"), 
+                     labels = c("New Design", "Old Design")) +
+  scale_fill_manual(values=c("#D55E00", "#0072B2"), 
+                     labels = c("New Design", "Old Design")) +
+  #scale_color_brewer(palette="Set1", direction=-1, labels = c("New Design", "Old Design")) +
+  #scale_fill_brewer(palette="Set1", direction=-1, labels = c("New Design", "Old Design")) +
   labs(x="Date and Time", y="Temperature (mV)", color = "") +
   scale_x_datetime(breaks = scales::date_breaks("4 hours"), 
                    labels = date_format("%d %b %Y %H:%M")) +
   theme_bw() +
   theme(axis.text.x=element_text(angle=20, vjust = 1, hjust=1),
-        legend.position = "top")
+        legend.position = "top", 
+        legend.text = element_text(size=10))
 
-#ggsave(here("figures", "final", "temp-deploy.png"), height=10, width=15, units="cm")
+#ggsave(here("temp", "figures", "FINAL(diss)", "temp-deploy.png"), height=10, width=15, units="cm")
 ```
 
 
